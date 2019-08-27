@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Suit {
     Spades,
     Hearts,
@@ -6,23 +6,27 @@ pub enum Suit {
     Diamonds,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)] // TODO: Do we want Copy?
 pub struct Card {
     suit: Suit,
     value: u8,
 }
 
 pub struct Deck {
+    cards: Vec<Card>,  // NOTE: The top of the deck is at the back.
 }
 
 pub struct Board {
+    stacks: [[Option<Card>; 5]; 5],
 }
 
 pub struct Game {
+    drawn: Option<Card>,    // Last drawn card, waiting to be placed
     deck: Deck,    // Remaining cards not on the board
     board: Board,
 }
 
+// TODO: Jokers
 impl Card {
     pub fn new(value: u8, suit: Suit) -> Result<Card, String> {
         if !(value >= 1 && value <= 13) { return Err(format!("{} is not a valid value for card (must be between 1 and 13).", value)) };
@@ -40,6 +44,27 @@ impl Card {
     }
 }
 
+impl Deck {
+    pub fn new_shuffled() -> Deck {
+        let mut cards = Vec::new();
+        for suit in vec![Suit::Spades, Suit::Hearts, Suit::Clubs, Suit::Diamonds] {   // TODO: Not sure if this is the best way to iterate over a static list of values.
+            for value in 1..(13 + 1) {
+                cards.push(Card::new(value, suit).unwrap());
+            }
+        }
+
+        use rand::seq::SliceRandom;
+        cards.shuffle(&mut rand::thread_rng());
+
+        return Deck { cards };
+    }
+
+    pub fn draw(&mut self) -> Result<Card, String> {
+        if self.cards.is_empty() { return Err("Tried to draw card when there was no more cards in the deck.".to_string()); }
+        return Ok(self.cards.pop().unwrap());
+    }
+}
+
 fn check_coord(x: i8, y: i8) -> Result<(i8, i8), String> {
     if x < -2 { return Err(format!("x coordinate {} is too low (must be between -2 and 2).", x)) };
     if x >  2 { return Err(format!("x coordinate {} is too high (must be between -2 and 2).", x)) };
@@ -50,22 +75,57 @@ fn check_coord(x: i8, y: i8) -> Result<(i8, i8), String> {
 }
 
 impl Board {
+    pub fn new_empty() -> Board {
+        return Board { stacks: [[None; 5]; 5] };
+    }
+
     pub fn get_card_at(&self, x: i8, y: i8) -> Result<Option<Card>, String> {
         check_coord(x, y).map(|(x, y)| {
-            if (x, y) == (0, 0) { return None }
-            else if x == -2 || y == -2 || x == 2 || y == 2 { return Some(Card::new(11, Suit::Spades).unwrap()) }
-            else { return Some(Card::new(5, Suit::Hearts).unwrap()) }
+            return self.stacks[(2 + x) as usize][(2 + y) as usize];
+        })
+    }
+
+    pub fn place_card_at(&mut self, x: i8, y: i8, card: Card) -> Result<(), String> {
+        check_coord(x, y).map(|(x, y)| {
+            self.stacks[(2 + x) as usize][(2 + y) as usize] = Some(card);
+        })
+    }
+
+    pub fn remove_card_at(&mut self, x: i8, y: i8) -> Result<(), String> {
+        check_coord(x, y).map(|(x, y)| {
+            self.stacks[(2 + x) as usize][(2 + y) as usize] = None;
         })
     }
 }
 
 impl Game {
     pub fn new() -> Game {
-        return Game {deck: Deck {}, board: Board {}};
+        Game { drawn: None, deck: Deck::new_shuffled(), board: Board::new_empty() }
     }
 
     pub fn get_card_at(&self, x: i8, y: i8) -> Result<Option<Card>, String> {
-        return self.board.get_card_at(x, y);
+        self.board.get_card_at(x, y)
+    }
+
+    pub fn place_card_at(&mut self, x: i8, y: i8) -> Result<(), String> {
+        if self.drawn.is_none() {
+            Err("Cannot place card because there is no drawn card.".to_string())
+        } else {
+            self.board.place_card_at(x, y, self.drawn.unwrap());
+            self.drawn = None;
+            Ok(())
+        }
+    }
+
+    pub fn draw(&mut self) -> Result<(), String> {
+        if self.drawn.is_some() { return Err("Cannot draw card while one is already drawn.".to_string()) }
+        self.deck.draw().map(|card| {
+            self.drawn = Some(card);
+        })
+    }
+
+    pub fn drawn(&self) -> Option<Card> {
+        return self.drawn;
     }
 }
 
