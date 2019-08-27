@@ -2,8 +2,6 @@ use sdl2::pixels::Color;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
-use std::time::Duration;
-
 use sdl2::render::{Canvas, RenderTarget, TextureCreator};
 use sdl2::ttf::{Font};
 
@@ -41,28 +39,22 @@ fn rect_for_card((x, y): (i8, i8)) -> Rect {
 pub fn main() {
     let mut game = game::Game::new();
 
-    // Graphics
+    let sdl = sdl2::init().unwrap();
+    let video = sdl.video().unwrap();
+    let ttf = sdl2::ttf::init().unwrap();
 
-    let sdl_context = sdl2::init().unwrap();
-    let sdl_video = sdl_context.video().unwrap();
-    let sdl_ttf = sdl2::ttf::init().unwrap();
+    let font = ttf.load_font("./sans.ttf", 22).unwrap();
 
-    let mono = sdl_ttf.load_font("./mono.ttf", 22).unwrap();
-    //let sans = sdl_ttf.load_font("./sans.ttf", 22).unwrap();
-
-    let window = sdl_video.window("Gridcannon", 925 + 25 + 200 + 25, 925)
+    let window = video.window("Gridcannon", 925 + 25 + 200 + 25, 925)
         .position_centered()
         .build().unwrap();
 
     let mut canvas = window.into_canvas().build().unwrap();
     let texture_creator = canvas.texture_creator();
 
-    let mut event_pump = sdl_context.event_pump().unwrap();
+    let mut event_pump = sdl.event_pump().unwrap();
 
-    let mut i = 0;
     'running: loop {
-        i = (i + 1) % 0xFF;
-
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit {..} |
@@ -73,32 +65,30 @@ pub fn main() {
                     if game.drawn().is_none() {
                         game.draw().unwrap();
                     } else {
-                        game.place_card_at(0, 0);
+                        game.place_card_at(0, 0).unwrap();
                     }
                 },
                 _ => {}
             }
         }
 
-        canvas.set_draw_color(Color::RGB(i, 0x80, 0xFF - i));
+        canvas.set_draw_color(Color::RGB(0x60, 0x60, 0x60));
         canvas.clear();
 
         // Render current (drawn) card
 
-        draw_card(&mut canvas, &texture_creator, &mono, game.drawn(), (3, -2));
+        draw_card(&mut canvas, &texture_creator, &font, game.drawn(), (3, -2));
 
         // Render board
 
         for x in -2..(2 + 1) {
             for y in -2..(2 + 1) {
                 if !((x == -2 || x == 2) && (y == -2 || y == 2)) {
-                    draw_card(&mut canvas, &texture_creator, &mono, game.get_card_at(x, y).unwrap(), (x, y));
+                    draw_card(&mut canvas, &texture_creator, &font, game.get_card_at(x, y).unwrap(), (x, y));
                 }
             }
         }
 
         canvas.present();
-
-        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
 }
