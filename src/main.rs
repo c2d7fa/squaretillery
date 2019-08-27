@@ -2,31 +2,38 @@ use sdl2::pixels::Color;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
-use sdl2::render::{Canvas, RenderTarget, TextureCreator};
+use sdl2::render::{Canvas, RenderTarget, TextureCreator, WindowCanvas};
+use sdl2::video::WindowContext;
 use sdl2::ttf::{Font};
 
 mod game;
 
-fn draw_text<'a, T: RenderTarget, U>(canvas: &mut Canvas<T>, texture_creator: &TextureCreator<U>, text: &'a str, font: &Font, color: Color, coord: (i32, i32))  {
-    let text_size = font.size_of(text).unwrap();
-    let text_surface = font.render(text).blended(color).unwrap();
-    let text_texture = texture_creator.create_texture_from_surface(text_surface).unwrap();
-    canvas.copy(&text_texture, None, Rect::new(coord.0, coord.1, text_size.0, text_size.1)).unwrap();
+struct DrawContext<'a> {
+    pub canvas: &'a mut WindowCanvas,
+    pub texture_creator: &'a TextureCreator<WindowContext>,
+    pub font: &'a Font<'a, 'static>,
 }
 
-fn draw_card<'a, T: RenderTarget, U>(canvas: &mut Canvas<T>, texture_creator: &TextureCreator<U>, font: &Font, card: Option<game::Card>, (x, y): (i8, i8)) {
+fn draw_text<'b>(context: &mut DrawContext, text: &'b str, color: Color, (x, y): (i32, i32)) {
+    let (w, h) = context.font.size_of(text).unwrap();
+    let text_surface = context.font.render(text).blended(color).unwrap();
+    let text_texture = context.texture_creator.create_texture_from_surface(text_surface).unwrap();
+    context.canvas.copy(&text_texture, None, Rect::new(x, y, w, h)).unwrap();
+}
+
+fn draw_card(context: &mut DrawContext, card: Option<game::Card>, (x, y): (i8, i8)) {
     match card {
         Some(card) => {
-            canvas.set_draw_color(Color::RGB(0xFF, 0xFF, 0xFF));
+            context.canvas.set_draw_color(Color::RGB(0xFF, 0xFF, 0xFF));
             let rect = rect_for_card((x, y));
-            canvas.fill_rect(rect).unwrap();
-            draw_text(canvas, texture_creator, &format!("{}", card.format_text_short()), font, Color::RGB(0x00, 0x00, 0x00), (rect.x() + 5, rect.y() + 5));
+            context.canvas.fill_rect(rect).unwrap();
+            draw_text(context, &format!("{}", card.format_text_short()), Color::RGB(0x00, 0x00, 0x00), (rect.x() + 5, rect.y() + 5));
         },
         None => {
             let rect = rect_for_card((x, y));
-            canvas.set_draw_color(Color::RGB(0xFF, 0xFF, 0xFF));
-            canvas.draw_rect(rect).unwrap();
-            draw_text(canvas, texture_creator, "No card", font, Color::RGB(0xFF, 0xFF, 0xFF), (rect.x() + 5, rect.y() + 5));
+            context.canvas.set_draw_color(Color::RGB(0xFF, 0xFF, 0xFF));
+            context.canvas.draw_rect(rect).unwrap();
+            draw_text(context, "No card", Color::RGB(0xFF, 0xFF, 0xFF), (rect.x() + 5, rect.y() + 5));
         },
     }
 }
@@ -54,6 +61,12 @@ pub fn main() {
 
     let mut event_pump = sdl.event_pump().unwrap();
 
+    let mut context = DrawContext {
+        canvas: &mut canvas,
+        texture_creator: &texture_creator,
+        font: &font,
+    };
+
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
@@ -72,23 +85,23 @@ pub fn main() {
             }
         }
 
-        canvas.set_draw_color(Color::RGB(0x60, 0x60, 0x60));
-        canvas.clear();
+        context.canvas.set_draw_color(Color::RGB(0x60, 0x60, 0x60));
+        context.canvas.clear();
 
         // Render current (drawn) card
 
-        draw_card(&mut canvas, &texture_creator, &font, game.drawn(), (3, -2));
+        draw_card(&mut context, game.drawn(), (3, -2));
 
         // Render board
 
         for x in -2..(2 + 1) {
             for y in -2..(2 + 1) {
                 if !((x == -2 || x == 2) && (y == -2 || y == 2)) {
-                    draw_card(&mut canvas, &texture_creator, &font, game.get_card_at(x, y).unwrap(), (x, y));
+                    draw_card(&mut context, game.get_card_at(x, y).unwrap(), (x, y));
                 }
             }
         }
 
-        canvas.present();
+        context.canvas.present();
     }
 }
