@@ -115,9 +115,9 @@ impl Game {
         if self.drawn.is_none() {
             Err("Cannot place card because there is no drawn card.".to_string())
         } else {
-            let result = self.board.place_card_at(x, y, self.drawn.unwrap());
+            self.board.place_card_at(x, y, self.drawn.unwrap())?;
             self.drawn = None;
-            result
+            Ok(())
         }
     }
 

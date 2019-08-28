@@ -21,7 +21,18 @@ fn draw_text<'b>(context: &mut DrawContext, text: &'b str, color: Color, (x, y):
     context.canvas.copy(&text_texture, None, Rect::new(x, y, w, h)).unwrap();
 }
 
-fn draw_card(context: &mut DrawContext, card: Option<game::Card>, (x, y): (i8, i8)) {
+fn draw_card(context: &mut DrawContext, card: game::Card, (x, y): (i32, i32)) {
+    context.canvas.set_draw_color(Color::RGB(0xC8, 0xC8, 0xC8));
+    context.canvas.fill_rect(Rect::new(x, y, 150, 150)).unwrap();
+    draw_text(context, &format!("{}", card.format_text_short()), Color::RGB(0x00, 0x00, 0x00), (x + 5, y + 5));
+}
+
+fn draw_card_on_board(context: &mut DrawContext, card: Option<game::Card>, (x, y): (i8, i8)) {
+    fn rect_for_card((x, y): (i8, i8)) -> Rect {
+        let (x_, y_) = (i32::from(x) + 2, i32::from(y) + 2);
+        return Rect::new(25 + (25 + 150) * x_, 25 + (25 + 150) * y_, 150, 150);
+    }
+
     match card {
         Some(card) => {
             context.canvas.set_draw_color(Color::RGB(0xFF, 0xFF, 0xFF));
@@ -38,13 +49,11 @@ fn draw_card(context: &mut DrawContext, card: Option<game::Card>, (x, y): (i8, i
     }
 }
 
-fn rect_for_card((x, y): (i8, i8)) -> Rect {
-    let (x_, y_) = (x as i32 + 2, y as i32 + 2);
-    return Rect::new(25 + (25 + 150) * x_, 25 + (25 + 150) * y_, 150, 150);
-}
-
 pub fn main() {
     let mut game = game::Game::new();
+
+    let mut dragged_card: Option<game::Card> = None;
+    let mut dragged_offset: Option<(i32, i32)> = None;
 
     let sdl = sdl2::init().unwrap();
     let video = sdl.video().unwrap();
@@ -77,8 +86,25 @@ pub fn main() {
                 Event::KeyDown { keycode: Some(Keycode::Return), .. } => {
                     if game.drawn().is_none() {
                         game.draw().unwrap();
-                    } else {
-                        game.place_card_at(0, 0).unwrap();
+                    }
+                },
+                Event::MouseButtonDown { x, y, .. } => {
+                    if y >= 25 && y <= 150 + 25 && x >= (25 + 150) * 5 + 25 && x <= (25 + 150) * 5 + 25 + 150 {
+                        game.drawn().map(|card| {
+                            dragged_card = Some(card);
+                            dragged_offset = Some((x - ((25 + 150) * 5 + 25), y - 25));
+                        });
+                    }
+                },
+                Event::MouseButtonUp { x, y, .. } => {
+                    if dragged_card.is_some() {
+                        let x_ = x / (25 + 150) - 2;
+                        let y_ = y / (25 + 150) - 2;
+
+                        game.place_card_at(x_ as i8, y_ as i8).unwrap_or(());
+
+                        dragged_card = None;
+                        dragged_offset = None;
                     }
                 },
                 _ => {}
@@ -88,19 +114,29 @@ pub fn main() {
         context.canvas.set_draw_color(Color::RGB(0x60, 0x60, 0x60));
         context.canvas.clear();
 
+
+
         // Render current (drawn) card
 
-        draw_card(&mut context, game.drawn(), (3, -2));
+        if dragged_card.is_none() {
+            draw_card_on_board(&mut context, game.drawn(), (3, -2));
+        }
 
         // Render board
 
         for x in -2..(2 + 1) {
             for y in -2..(2 + 1) {
                 if !((x == -2 || x == 2) && (y == -2 || y == 2)) {
-                    draw_card(&mut context, game.get_card_at(x, y).unwrap(), (x, y));
+                    draw_card_on_board(&mut context, game.get_card_at(x, y).unwrap(), (x, y));
                 }
             }
         }
+
+        // Render card being dragged
+
+        dragged_card.map(|card| {
+            draw_card(&mut context, card, (event_pump.mouse_state().x() - dragged_offset.unwrap().0, event_pump.mouse_state().y() - dragged_offset.unwrap().1));
+        });
 
         context.canvas.present();
     }
