@@ -121,6 +121,11 @@ impl Game {
         }
     }
 
+    // TODO: Temporary. Game should know when to remove cards itself.
+    pub fn remove_card_at(&mut self, x: i8, y: i8) -> Result<(), String> {
+        self.board.remove_card_at(x, y)
+    }
+
     pub fn draw(&mut self) -> Result<(), String> {
         if self.drawn.is_some() { return Err("Cannot draw card while one is already drawn.".to_string()) }
         self.deck.draw().map(|card| {

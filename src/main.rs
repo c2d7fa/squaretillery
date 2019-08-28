@@ -4,9 +4,26 @@ use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
 use sdl2::render::{Canvas, RenderTarget, TextureCreator, WindowCanvas};
 use sdl2::video::WindowContext;
+use sdl2::mouse::MouseButton;
 use sdl2::ttf::{Font};
 
 mod game;
+
+fn translate_screen_to_board((x, y): (i32, i32)) -> Option<(i8, i8)> {
+    let width = 150;
+    let margin = 25;
+
+    let board_x = x / (margin + width) - 2;
+    let board_y = y / (margin + width) - 2;
+
+    if (board_x == 2 || board_x == -2) && (board_y == 2 || board_y == -2) {
+        None
+    } else if board_x > 2 || board_y > 2 {
+        None
+    } else {
+        Some((board_x as i8, board_y as i8))
+    }
+}
 
 struct DrawContext<'a> {
     pub canvas: &'a mut WindowCanvas,
@@ -88,7 +105,7 @@ pub fn main() {
                         game.draw().unwrap();
                     }
                 },
-                Event::MouseButtonDown { x, y, .. } => {
+                Event::MouseButtonDown { x, y, mouse_btn: MouseButton::Left, .. } => {
                     if y >= 25 && y <= 150 + 25 && x >= (25 + 150) * 5 + 25 && x <= (25 + 150) * 5 + 25 + 150 {
                         game.drawn().map(|card| {
                             dragged_card = Some(card);
@@ -96,16 +113,20 @@ pub fn main() {
                         });
                     }
                 },
-                Event::MouseButtonUp { x, y, .. } => {
+                Event::MouseButtonUp { x, y, mouse_btn: MouseButton::Left, .. } => {
                     if dragged_card.is_some() {
-                        let x_ = x / (25 + 150) - 2;
-                        let y_ = y / (25 + 150) - 2;
-
-                        game.place_card_at(x_ as i8, y_ as i8).unwrap_or(());
+                        translate_screen_to_board((x, y)).map(|(board_x, board_y)| {
+                            game.place_card_at(board_x, board_y).unwrap();
+                        });
 
                         dragged_card = None;
                         dragged_offset = None;
                     }
+                },
+                Event::MouseButtonUp { x, y, mouse_btn: MouseButton::Middle, .. } => {
+                    translate_screen_to_board((x, y)).map(|(board_x, board_y)| {
+                        game.remove_card_at(board_x, board_y).unwrap()
+                    });
                 },
                 _ => {}
             }
