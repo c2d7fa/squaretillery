@@ -6,7 +6,7 @@ pub enum Suit {
     Diamonds,
 }
 
-#[derive(Debug, Clone, Copy)] // TODO: Do we want Copy?
+#[derive(Clone, Copy)]
 pub struct Card {
     suit: Suit,
     value: u8,
@@ -67,38 +67,43 @@ impl Deck {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct BoardPosition {
+    x: i8,
+    y: i8,
+}
 
-impl Board {
-    pub fn new_empty() -> Board {
-        Board { stacks: [[None; 5]; 5] }
-    }
-
-    pub fn get_card_at(&self, x: i8, y: i8) -> Result<Option<Card>, String> {
-        Self::check_coord(x, y).map(|(x, y)| {
-            return self.stacks[(2 + x) as usize][(2 + y) as usize];
-        })
-    }
-
-    pub fn place_card_at(&mut self, x: i8, y: i8, card: Card) -> Result<(), String> {
-        Self::check_coord(x, y).map(|(x, y)| {
-            self.stacks[(2 + x) as usize][(2 + y) as usize] = Some(card);
-        })
-    }
-
-    pub fn remove_card_at(&mut self, x: i8, y: i8) -> Result<(), String> {
-        Self::check_coord(x, y).map(|(x, y)| {
-            self.stacks[(2 + x) as usize][(2 + y) as usize] = None;
-        })
-    }
-
-    fn check_coord(x: i8, y: i8) -> Result<(i8, i8), String> {
+impl BoardPosition {
+    pub fn new((x, y): (i8, i8)) -> Result<BoardPosition, String> {
         if x < -2 { return Err(format!("{:?} is an invalid coordiate: x coordinate {} is too low (must be between -2 and 2).", (x, y), x)) };
         if x >  2 { return Err(format!("{:?} is an invalid coordiate: x coordinate {} is too high (must be between -2 and 2).", (x, y), x)) };
         if y < -2 { return Err(format!("{:?} is an invalid coordiate: y coordinate {} is too low (must be between -2 and 2).", (x, y), y)) };
         if y >  2 { return Err(format!("{:?} is an invalid coordiate: y coordinate {} is too high (must be between -2 and 2).", (x, y), y)) };
         if (x == -2 || x == 2) && (y == -2 || y == 2) { return Err(format!("{:?} is an invalid coordianate: there are no cards in the corners of the board.", (x, y))); }
 
-        Ok((x, y))
+        Ok(BoardPosition { x, y })
+    }
+
+    pub fn x(&self) -> i8 { self.x }
+    pub fn y(&self) -> i8 { self.y }
+}
+
+impl Board {
+    pub fn new_empty() -> Board {
+        Board { stacks: [[None; 5]; 5] }
+    }
+
+
+    pub fn get_card_at(&self, pos: BoardPosition) -> Option<Card> {
+        self.stacks[(2 + pos.x()) as usize][(2 + pos.y()) as usize]
+    }
+
+    pub fn place_card_at(&mut self, pos: BoardPosition, card: Card) {
+        self.stacks[(2 + pos.x()) as usize][(2 + pos.y()) as usize] = Some(card);
+    }
+
+    pub fn remove_card_at(&mut self, pos: BoardPosition) {
+        self.stacks[(2 + pos.x()) as usize][(2 + pos.y()) as usize] = None;
     }
 }
 
@@ -107,23 +112,23 @@ impl Game {
         Game { drawn: None, deck: Deck::new_shuffled(), board: Board::new_empty() }
     }
 
-    pub fn get_card_at(&self, x: i8, y: i8) -> Result<Option<Card>, String> {
-        self.board.get_card_at(x, y)
+    pub fn get_card_at(&self, pos: BoardPosition) -> Option<Card> {
+        self.board.get_card_at(pos)
     }
 
-    pub fn place_card_at(&mut self, x: i8, y: i8) -> Result<(), String> {
+    pub fn place_card_at(&mut self, pos: BoardPosition) -> Result<(), String> {
         if self.drawn.is_none() {
             Err("Cannot place card because there is no drawn card.".to_string())
         } else {
-            self.board.place_card_at(x, y, self.drawn.unwrap())?;
+            self.board.place_card_at(pos, self.drawn.unwrap());
             self.drawn = None;
             Ok(())
         }
     }
 
     // TODO: Temporary. Game should know when to remove cards itself.
-    pub fn remove_card_at(&mut self, x: i8, y: i8) -> Result<(), String> {
-        self.board.remove_card_at(x, y)
+    pub fn remove_card_at(&mut self, pos: BoardPosition) {
+        self.board.remove_card_at(pos);
     }
 
     pub fn draw(&mut self) -> Result<(), String> {

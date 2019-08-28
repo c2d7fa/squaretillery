@@ -2,27 +2,22 @@ use sdl2::pixels::Color;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
-use sdl2::render::{Canvas, RenderTarget, TextureCreator, WindowCanvas};
+use sdl2::render::{TextureCreator, WindowCanvas};
 use sdl2::video::WindowContext;
 use sdl2::mouse::MouseButton;
 use sdl2::ttf::{Font};
 
 mod game;
+use game::{BoardPosition};
 
-fn translate_screen_to_board((x, y): (i32, i32)) -> Option<(i8, i8)> {
+fn translate_screen_to_board((x, y): (i32, i32)) -> Option<BoardPosition> {
     let width = 150;
     let margin = 25;
 
     let board_x = x / (margin + width) - 2;
     let board_y = y / (margin + width) - 2;
 
-    if (board_x == 2 || board_x == -2) && (board_y == 2 || board_y == -2) {
-        None
-    } else if board_x > 2 || board_y > 2 {
-        None
-    } else {
-        Some((board_x as i8, board_y as i8))
-    }
+    BoardPosition::new((board_x as i8, board_y as i8)).ok()  // TODO: Use safe conversion
 }
 
 struct DrawContext<'a> {
@@ -38,32 +33,24 @@ fn draw_text<'b>(context: &mut DrawContext, text: &'b str, color: Color, (x, y):
     context.canvas.copy(&text_texture, None, Rect::new(x, y, w, h)).unwrap();
 }
 
-fn draw_card(context: &mut DrawContext, card: game::Card, (x, y): (i32, i32)) {
-    context.canvas.set_draw_color(Color::RGB(0xC8, 0xC8, 0xC8));
-    context.canvas.fill_rect(Rect::new(x, y, 150, 150)).unwrap();
-    draw_text(context, &format!("{}", card.format_text_short()), Color::RGB(0x00, 0x00, 0x00), (x + 5, y + 5));
-}
-
-fn draw_card_on_board(context: &mut DrawContext, card: Option<game::Card>, (x, y): (i8, i8)) {
-    fn rect_for_card((x, y): (i8, i8)) -> Rect {
-        let (x_, y_) = (i32::from(x) + 2, i32::from(y) + 2);
-        return Rect::new(25 + (25 + 150) * x_, 25 + (25 + 150) * y_, 150, 150);
-    }
-
+fn draw_card(context: &mut DrawContext, card: Option<game::Card>, (x, y): (i32, i32)) {
+    let rect = Rect::new(x, y, 150, 150);
     match card {
         Some(card) => {
             context.canvas.set_draw_color(Color::RGB(0xFF, 0xFF, 0xFF));
-            let rect = rect_for_card((x, y));
             context.canvas.fill_rect(rect).unwrap();
             draw_text(context, &format!("{}", card.format_text_short()), Color::RGB(0x00, 0x00, 0x00), (rect.x() + 5, rect.y() + 5));
         },
         None => {
-            let rect = rect_for_card((x, y));
             context.canvas.set_draw_color(Color::RGB(0xFF, 0xFF, 0xFF));
             context.canvas.draw_rect(rect).unwrap();
             draw_text(context, "No card", Color::RGB(0xFF, 0xFF, 0xFF), (rect.x() + 5, rect.y() + 5));
         },
     }
+}
+
+fn draw_card_on_board(context: &mut DrawContext, card: Option<game::Card>, pos: BoardPosition) {
+    draw_card(context, card, (25 + (25 + 150) * (pos.x() as i32 + 2), 25 + (25 + 150) * (pos.y() as i32 + 2)));
 }
 
 pub fn main() {
@@ -78,7 +65,7 @@ pub fn main() {
 
     let font = ttf.load_font("./sans.ttf", 22).unwrap();
 
-    let window = video.window("Gridcannon", 925 + 25 + 200 + 25, 925)
+    let window = video.window("Gridcannon", 900 + 150 + 25, 900)
         .position_centered()
         .build().unwrap();
 
@@ -115,8 +102,8 @@ pub fn main() {
                 },
                 Event::MouseButtonUp { x, y, mouse_btn: MouseButton::Left, .. } => {
                     if dragged_card.is_some() {
-                        translate_screen_to_board((x, y)).map(|(board_x, board_y)| {
-                            game.place_card_at(board_x, board_y).unwrap();
+                        translate_screen_to_board((x, y)).map(|pos| {
+                            game.place_card_at(pos).unwrap();
                         });
 
                         dragged_card = None;
@@ -124,8 +111,8 @@ pub fn main() {
                     }
                 },
                 Event::MouseButtonUp { x, y, mouse_btn: MouseButton::Middle, .. } => {
-                    translate_screen_to_board((x, y)).map(|(board_x, board_y)| {
-                        game.remove_card_at(board_x, board_y).unwrap()
+                    translate_screen_to_board((x, y)).map(|pos| {
+                        game.remove_card_at(pos)
                     });
                 },
                 _ => {}
@@ -140,15 +127,15 @@ pub fn main() {
         // Render current (drawn) card
 
         if dragged_card.is_none() {
-            draw_card_on_board(&mut context, game.drawn(), (3, -2));
+            draw_card(&mut context, game.drawn(), ((25 + 150) * 5 + 25, 25));
         }
 
         // Render board
 
         for x in -2..(2 + 1) {
             for y in -2..(2 + 1) {
-                if !((x == -2 || x == 2) && (y == -2 || y == 2)) {
-                    draw_card_on_board(&mut context, game.get_card_at(x, y).unwrap(), (x, y));
+                if let Ok(pos) = BoardPosition::new((x, y)) {
+                    draw_card_on_board(&mut context, game.get_card_at(pos), pos);
                 }
             }
         }
@@ -156,7 +143,7 @@ pub fn main() {
         // Render card being dragged
 
         dragged_card.map(|card| {
-            draw_card(&mut context, card, (event_pump.mouse_state().x() - dragged_offset.unwrap().0, event_pump.mouse_state().y() - dragged_offset.unwrap().1));
+            draw_card(&mut context, Some(card), (event_pump.mouse_state().x() - dragged_offset.unwrap().0, event_pump.mouse_state().y() - dragged_offset.unwrap().1));
         });
 
         context.canvas.present();
