@@ -6,23 +6,26 @@ pub enum Suit {
     Diamonds,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Card {
     suit: Suit,
     value: u8,
 }
 
-pub struct Deck {
-    cards: Vec<Card>,  // NOTE: The top of the deck is at the back.
+#[derive(Debug)]
+pub struct Pile {
+    cards: Vec<Card>,  // NOTE: The top of the pile is at the back.
 }
 
+#[derive(Debug)]
 pub struct Board {
     stacks: [[Option<Card>; 5]; 5],
 }
 
+#[derive(Debug)]
 pub struct Game {
     drawn: Option<Card>,  // Last drawn card, currently waiting to be placed
-    deck: Deck,           // Remaining cards not on the board
+    deck: Pile,           // Remaining cards not on the board
     board: Board,
 }
 
@@ -43,10 +46,18 @@ impl Card {
         };
         format!("{}{}", suit_string, &self.value)
     }
+
+    pub fn is_royal(&self) -> bool {
+        self.value >= 11
+    }
 }
 
-impl Deck {
-    pub fn new_shuffled() -> Deck {
+impl Pile {
+    pub fn new() -> Self {
+        Self { cards: vec![] }
+    }
+
+    pub fn new_shuffled_deck() -> Self {
         use rand::seq::SliceRandom;
 
         let mut cards = Vec::new();
@@ -58,7 +69,20 @@ impl Deck {
 
         cards.shuffle(&mut rand::thread_rng());
 
-        Deck { cards }
+        Self { cards }
+    }
+
+    pub fn top(&self) -> Option<Card> {
+        self.cards.last().map(|card| { *card })
+    }
+
+    pub fn place_on_top(&mut self, card: Card) {
+        self.cards.push(card);
+    }
+
+    // Note: This consumes the other pile.
+    pub fn place_pile_on_top(&mut self, mut pile: Pile) {
+        self.cards.append(&mut pile.cards);
     }
 
     pub fn draw(&mut self) -> Result<Card, String> {
@@ -93,7 +117,6 @@ impl Board {
         Board { stacks: [[None; 5]; 5] }
     }
 
-
     pub fn get_card_at(&self, pos: BoardPosition) -> Option<Card> {
         self.stacks[(2 + pos.x()) as usize][(2 + pos.y()) as usize]
     }
@@ -109,7 +132,25 @@ impl Board {
 
 impl Game {
     pub fn new() -> Game {
-        Game { drawn: None, deck: Deck::new_shuffled(), board: Board::new_empty() }
+        Game { drawn: None, deck: Pile::new_shuffled_deck(), board: Board::new_empty() }
+    }
+
+    pub fn set_up(&mut self) {
+        let mut royals_pile = Pile::new();
+
+        for position in vec![(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)] {
+            'search_card: loop {
+                let card = self.deck.draw().unwrap();
+                if card.is_royal() {
+                    royals_pile.place_on_top(card);
+                } else {
+                    self.board.place_card_at(BoardPosition::new(position).unwrap(), card);
+                    break 'search_card;
+                }
+            }
+        }
+
+        self.deck.place_pile_on_top(royals_pile);
     }
 
     pub fn get_card_at(&self, pos: BoardPosition) -> Option<Card> {

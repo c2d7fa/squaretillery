@@ -55,6 +55,7 @@ fn draw_card_on_board(context: &mut DrawContext, card: Option<game::Card>, pos: 
 
 pub fn main() {
     let mut game = game::Game::new();
+    game.set_up();
 
     let mut dragged_card: Option<game::Card> = None;
     let mut dragged_offset: Option<(i32, i32)> = None;
