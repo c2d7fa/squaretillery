@@ -113,7 +113,12 @@ pub fn main() {
                 },
                 Event::MouseButtonUp { x, y, mouse_btn: MouseButton::Middle, .. } => {
                     translate_screen_to_board((x, y)).map(|pos| {
-                        game.remove_card_at(pos)
+                        game.remove_pile_at(pos)
+                    });
+                },
+                Event::MouseButtonUp { x, y, mouse_btn: MouseButton::Right, .. } => {
+                    translate_screen_to_board((x, y)).map(|pos| {
+                        game.move_pile_to_bottom_of_deck_at(pos)
                     });
                 },
                 _ => {}
@@ -130,6 +135,8 @@ pub fn main() {
         if dragged_card.is_none() {
             draw_card(&mut context, game.drawn(), ((25 + 150) * 5 + 25, 25));
         }
+
+        draw_text(&mut context, &format!("{} cards", game.cards_left()), Color::RGB(0xFF, 0xFF, 0xFF), ((25 + 150) * 5 + 25, 25 + 150 + 25));
 
         // Render board
 

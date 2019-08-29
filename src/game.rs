@@ -19,7 +19,7 @@ pub struct Pile {
 
 #[derive(Debug)]
 pub struct Board {
-    stacks: [[Option<Card>; 5]; 5],
+    stacks: [[Pile; 5]; 5],
 }
 
 #[derive(Debug)]
@@ -76,7 +76,7 @@ impl Pile {
         self.cards.last().map(|card| { *card })
     }
 
-    pub fn place_on_top(&mut self, card: Card) {
+    pub fn place_card_on_top(&mut self, card: Card) {
         self.cards.push(card);
     }
 
@@ -85,9 +85,19 @@ impl Pile {
         self.cards.append(&mut pile.cards);
     }
 
+    // Note: This consumes the other pile.
+    pub fn place_pile_on_bottom(&mut self, mut pile: Pile) {
+        pile.cards.append(&mut self.cards);
+        self.cards = pile.cards;
+    }
+
     pub fn draw(&mut self) -> Result<Card, String> {
         if self.cards.is_empty() { return Err("Tried to draw card when there was no more cards in the deck.".to_string()); }
         Ok(self.cards.pop().unwrap())
+    }
+
+    pub fn size(&self) -> usize {
+        self.cards.len()
     }
 }
 
@@ -114,19 +124,47 @@ impl BoardPosition {
 
 impl Board {
     pub fn new_empty() -> Board {
-        Board { stacks: [[None; 5]; 5] }
+        // TODO: This is probably a bad way of doing this. Also, I don't really
+        // understand the code, I just copied it from StackOverflow.
+        //
+        // We can't do this in the obvious way, [[Pile::new(); 5]; 5], because
+        // Pile does not (and cannot) implement Copy.
+        //
+        // https://stackoverflow.com/questions/31360993/what-is-the-proper-way-to-initialize-a-fixed-length-array
+        let stacks = unsafe {
+            let mut result: [[Pile; 5]; 5] = std::mem::uninitialized();
+            for (_, element) in result.iter_mut().enumerate() {
+                let mut value: [Pile; 5] = std::mem::uninitialized();
+                for (_, element) in value.iter_mut().enumerate() {
+                    std::ptr::write(element, Pile::new());
+                }
+                std::ptr::write(element, value);
+            }
+            result
+        };
+
+        Board { stacks }
     }
 
+    pub fn get_pile_at(&self, pos: BoardPosition) -> &Pile {
+        &self.stacks[(2 + pos.x()) as usize][(2 + pos.y()) as usize]
+    }
+
+
     pub fn get_card_at(&self, pos: BoardPosition) -> Option<Card> {
-        self.stacks[(2 + pos.x()) as usize][(2 + pos.y()) as usize]
+        self.get_pile_at(pos).top()
     }
 
     pub fn place_card_at(&mut self, pos: BoardPosition, card: Card) {
-        self.stacks[(2 + pos.x()) as usize][(2 + pos.y()) as usize] = Some(card);
+        self.stacks[(2 + pos.x()) as usize][(2 + pos.y()) as usize].place_card_on_top(card);
     }
 
-    pub fn remove_card_at(&mut self, pos: BoardPosition) {
-        self.stacks[(2 + pos.x()) as usize][(2 + pos.y()) as usize] = None;
+    pub fn remove_pile_at(&mut self, pos: BoardPosition) {
+        self.stacks[(2 + pos.x()) as usize][(2 + pos.y()) as usize] = Pile::new();
+    }
+
+    pub fn take_pile_at(&mut self, pos: BoardPosition) -> Pile {
+        std::mem::replace(&mut self.stacks[(2 + pos.x()) as usize][(2 + pos.y()) as usize], Pile::new())
     }
 }
 
@@ -142,7 +180,7 @@ impl Game {
             'search_card: loop {
                 let card = self.deck.draw().unwrap();
                 if card.is_royal() {
-                    royals_pile.place_on_top(card);
+                    royals_pile.place_card_on_top(card);
                 } else {
                     self.board.place_card_at(BoardPosition::new(position).unwrap(), card);
                     break 'search_card;
@@ -167,9 +205,15 @@ impl Game {
         }
     }
 
-    // TODO: Temporary. Game should know when to remove cards itself.
-    pub fn remove_card_at(&mut self, pos: BoardPosition) {
-        self.board.remove_card_at(pos);
+    // TODO: remove_pile_at, move_pile_to_bottom_of_deck_at: Game itself should
+    // know when to move piles around.
+
+    pub fn remove_pile_at(&mut self, pos: BoardPosition) {
+        self.board.remove_pile_at(pos);
+    }
+
+    pub fn move_pile_to_bottom_of_deck_at(&mut self, pos: BoardPosition) {
+        self.deck.place_pile_on_bottom(self.board.take_pile_at(pos));
     }
 
     pub fn draw(&mut self) -> Result<(), String> {
@@ -181,6 +225,10 @@ impl Game {
 
     pub fn drawn(&self) -> Option<Card> {
         self.drawn
+    }
+
+    pub fn cards_left(&self) -> usize {
+        self.deck.size()
     }
 }
 
