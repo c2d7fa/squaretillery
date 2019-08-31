@@ -24,6 +24,7 @@ struct DrawContext<'a> {
     pub canvas: &'a mut WindowCanvas,
     pub texture_creator: &'a TextureCreator<WindowContext>,
     pub font: &'a Font<'a, 'static>,
+    pub card_font: &'a Font<'a, 'static>,
 }
 
 fn draw_text<'b>(context: &mut DrawContext, text: &'b str, color: Color, (x, y): (i32, i32)) {
@@ -33,18 +34,43 @@ fn draw_text<'b>(context: &mut DrawContext, text: &'b str, color: Color, (x, y):
     context.canvas.copy(&text_texture, None, Rect::new(x, y, w, h)).unwrap();
 }
 
+// TODO: Clean up
+fn draw_card_text<'b>(context: &mut DrawContext, text: &'b str, color: Color, (x, y): (i32, i32)) {
+    let (w, h) = context.card_font.size_of(text).unwrap();
+    let text_surface = context.card_font.render(text).blended(color).unwrap();
+    let text_texture = context.texture_creator.create_texture_from_surface(text_surface).unwrap();
+    context.canvas.copy(&text_texture, None, Rect::new(x, y, w, h)).unwrap();
+}
+
+fn color_for_suit(suit: game::Suit) -> Color {
+    match suit {
+        game::Suit::Hearts => { Color::RGB(0xD0, 0x60, 0x60) },
+        game::Suit::Diamonds => { Color::RGB(0xC8, 0x78, 0x60) },
+        game::Suit::Spades => { Color::RGB(0x60, 0x60, 0xD0) },
+        game::Suit::Clubs => { Color::RGB(0x60, 0x90, 0xB8) },
+    }
+}
+
 fn draw_card(context: &mut DrawContext, card: Option<game::Card>, (x, y): (i32, i32)) {
     let rect = Rect::new(x, y, 150, 150);
     match card {
         Some(card) => {
-            context.canvas.set_draw_color(Color::RGB(0xFF, 0xFF, 0xFF));
-            context.canvas.fill_rect(rect).unwrap();
-            draw_text(context, &format!("{}", card.format_text_short()), Color::RGB(0x00, 0x00, 0x00), (rect.x() + 5, rect.y() + 5));
+            let color = color_for_suit(card.suit());
+            if card.is_royal() {
+                context.canvas.set_draw_color(Color::RGB(0xE0, 0xA8, 0x38));
+                context.canvas.fill_rect(rect).unwrap();
+                context.canvas.set_draw_color(color);
+                context.canvas.fill_rect(Rect::new(x + 8, y + 8, 150 - 16, 150 - 16));
+            } else {
+                context.canvas.set_draw_color(color);
+                context.canvas.fill_rect(rect).unwrap();
+            }
+            draw_card_text(context, &format!("{}", card.value()), Color::RGB(0xFF, 0xFF, 0xFF), (rect.x() + 20, rect.y() + 20));
         },
         None => {
-            context.canvas.set_draw_color(Color::RGB(0xFF, 0xFF, 0xFF));
-            context.canvas.draw_rect(rect).unwrap();
-            draw_text(context, "No card", Color::RGB(0xFF, 0xFF, 0xFF), (rect.x() + 5, rect.y() + 5));
+            context.canvas.set_draw_color(Color::RGB(0xF2, 0xEB, 0xE8));
+            context.canvas.set_draw_color(Color::RGB(0xE2, 0xDB, 0xD8));
+            context.canvas.fill_rect(rect).unwrap();
         },
     }
 }
@@ -64,7 +90,8 @@ pub fn main() {
     let video = sdl.video().unwrap();
     let ttf = sdl2::ttf::init().unwrap();
 
-    let font = ttf.load_font("./sans.ttf", 22).unwrap();
+    let font = ttf.load_font("./sansb.ttf", 22).unwrap();
+    let card_font = ttf.load_font("./sansb.ttf", 38).unwrap();
 
     let window = video.window("Gridcannon", 900 + 150 + 25, 900)
         .position_centered()
@@ -79,6 +106,7 @@ pub fn main() {
         canvas: &mut canvas,
         texture_creator: &texture_creator,
         font: &font,
+        card_font: &card_font,
     };
 
     'running: loop {
@@ -125,18 +153,18 @@ pub fn main() {
             }
         }
 
-        context.canvas.set_draw_color(Color::RGB(0x60, 0x60, 0x60));
+        context.canvas.set_draw_color(Color::RGB(0xF2, 0xEB, 0xE8));
         context.canvas.clear();
-
-
 
         // Render current (drawn) card
 
         if dragged_card.is_none() {
             draw_card(&mut context, game.drawn(), ((25 + 150) * 5 + 25, 25));
+        } else {
+            draw_card(&mut context, None, ((25 + 150) * 5 + 25, 25));
         }
 
-        draw_text(&mut context, &format!("{} cards", game.cards_left()), Color::RGB(0xFF, 0xFF, 0xFF), ((25 + 150) * 5 + 25, 25 + 150 + 25));
+        draw_text(&mut context, &format!("{} LEFT", game.cards_left()), Color::RGB(0x82, 0x7B, 0x78), ((25 + 150) * 5 + 25 + 25, 25 + 150 + 8));
 
         // Render board
 

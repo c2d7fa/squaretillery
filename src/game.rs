@@ -50,6 +50,9 @@ impl Card {
     pub fn is_royal(&self) -> bool {
         self.value >= 11
     }
+
+    pub fn value(&self) -> u8 { self.value }
+    pub fn suit(&self) -> Suit { self.suit }
 }
 
 impl Pile {
