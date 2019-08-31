@@ -138,6 +138,11 @@ pub fn main() {
                         });
                     }
                 },
+                Event::KeyDown { keycode: Some(Keycode::S), .. } => {
+                    if game.drawn().is_some() {
+                        game.add_to_shame_pile();
+                    }
+                },
                 Event::MouseButtonDown { x, y, mouse_btn: MouseButton::Left, .. } => {
                     if y >= 25 && y <= 150 + 25 && x >= (25 + 150) * 5 + 25 && x <= (25 + 150) * 5 + 25 + 150 {
                         game.drawn().map(|card| {
@@ -181,7 +186,13 @@ pub fn main() {
             draw_card(&mut context, None, ((25 + 150) * 5 + 25, 25));
         }
 
-        draw_text(&mut context, &format!("{} LEFT", game.cards_left()), Color::RGB(0x82, 0x7B, 0x78), ((25 + 150) * 5 + 25 + 25, 25 + 150 + 8));
+        draw_text(&mut context, &format!("{} LEFT", game.cards_left()), Color::RGB(0x82, 0x7B, 0x78), ((25 + 150) * 5 + 25, 25 + 150 + 8));
+
+        // Render shame
+
+        if game.get_shame() > 0 {
+            draw_text(&mut context, &format!("{} SHAME", game.get_shame()), Color::RGB(0xC2, 0x7B, 0x78), ((25 + 150) * 5 + 25, 25 + 150 + 8 + 22 + 8));
+        }
 
         // Render board
 

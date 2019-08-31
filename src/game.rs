@@ -28,6 +28,7 @@ pub struct Game {
     drawn: Option<Card>,  // Last drawn card, currently waiting to be placed
     deck: Pile,           // Remaining cards not on the board
     board: Board,
+    shame: u8,
 }
 
 // TODO: Jokers
@@ -176,7 +177,7 @@ impl Board {
 
 impl Game {
     pub fn new() -> Game {
-        Game { drawn: None, deck: Pile::new_shuffled_deck(), board: Board::new_empty() }
+        Game { drawn: None, deck: Pile::new_shuffled_deck(), board: Board::new_empty(), shame: 0 }
     }
 
     pub fn set_up(&mut self) {
@@ -249,6 +250,15 @@ impl Game {
 
     pub fn cards_left(&self) -> usize {
         self.deck.size()
+    }
+
+    pub fn add_to_shame_pile(&mut self) {
+        self.drawn = None;
+        self.shame += 1;
+    }
+
+    pub fn get_shame(&self) -> u8 {
+        self.shame
     }
 }
 
