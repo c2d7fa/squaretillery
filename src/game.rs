@@ -20,6 +20,7 @@ pub struct Pile {
 #[derive(Debug)]
 pub struct Board {
     stacks: [[Pile; 5]; 5],
+    armor: [[u8; 5]; 5],     // TODO: This is an inelegant representation. Should this even be here, or should it be somewhere else?
 }
 
 #[derive(Debug)]
@@ -35,16 +36,6 @@ impl Card {
         if !(value >= 1 && value <= 13) { return Err(format!("{} is not a valid value for card (must be between 1 and 13).", value)) };
 
         Ok(Card { suit, value })
-    }
-
-    pub fn format_text_short(&self) -> String {
-        let suit_string = match &self.suit {
-            Suit::Spades => "S",
-            Suit::Hearts => "H",
-            Suit::Clubs => "C",
-            Suit::Diamonds => "D",
-        };
-        format!("{}{}", suit_string, &self.value)
     }
 
     pub fn is_royal(&self) -> bool {
@@ -104,7 +95,7 @@ impl Pile {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct BoardPosition {
     x: i8,
     y: i8,
@@ -146,7 +137,7 @@ impl Board {
             result
         };
 
-        Board { stacks }
+        Board { stacks, armor: [[0; 5]; 5] }
     }
 
     pub fn get_pile_at(&self, pos: BoardPosition) -> &Pile {
@@ -164,10 +155,22 @@ impl Board {
 
     pub fn remove_pile_at(&mut self, pos: BoardPosition) {
         self.stacks[(2 + pos.x()) as usize][(2 + pos.y()) as usize] = Pile::new();
+        self.armor[(2 + pos.x()) as usize][(2 + pos.y()) as usize] = 0;
     }
 
     pub fn take_pile_at(&mut self, pos: BoardPosition) -> Pile {
+        self.armor[(2 + pos.x()) as usize][(2 + pos.y()) as usize] = 0;
         std::mem::replace(&mut self.stacks[(2 + pos.x()) as usize][(2 + pos.y()) as usize], Pile::new())
+    }
+
+    // TODO: This should probably check whether it even makes sense for that
+    // card to have armor.
+    pub fn add_armor_at(&mut self, pos: BoardPosition, amount: u8) {
+        self.armor[(2 + pos.x()) as usize][(2 + pos.y()) as usize] += amount;
+    }
+
+    pub fn get_armor_at(&self, pos: BoardPosition) -> u8 {
+        self.armor[(2 + pos.x()) as usize][(2 + pos.y()) as usize]
     }
 }
 
@@ -206,6 +209,20 @@ impl Game {
             self.drawn = None;
             Ok(())
         }
+    }
+
+    pub fn add_armor_at(&mut self, pos: BoardPosition) -> Result<(), String> {
+        if self.drawn.is_none() {
+            Err("Cannot add armor because no card is drawn.".to_string())
+        } else {
+            self.board.add_armor_at(pos, self.drawn.unwrap().value());
+            self.drawn = None;
+            Ok(())
+        }
+    }
+
+    pub fn get_armor_at(&self, pos: BoardPosition) -> u8 {
+        self.board.get_armor_at(pos)
     }
 
     // TODO: remove_pile_at, move_pile_to_bottom_of_deck_at: Game itself should

@@ -60,7 +60,7 @@ fn draw_card(context: &mut DrawContext, card: Option<game::Card>, (x, y): (i32, 
                 context.canvas.set_draw_color(Color::RGB(0xE0, 0xA8, 0x38));
                 context.canvas.fill_rect(rect).unwrap();
                 context.canvas.set_draw_color(color);
-                context.canvas.fill_rect(Rect::new(x + 8, y + 8, 150 - 16, 150 - 16));
+                context.canvas.fill_rect(Rect::new(x + 8, y + 8, 150 - 16, 150 - 16)).unwrap();
             } else {
                 context.canvas.set_draw_color(color);
                 context.canvas.fill_rect(rect).unwrap();
@@ -75,8 +75,17 @@ fn draw_card(context: &mut DrawContext, card: Option<game::Card>, (x, y): (i32, 
     }
 }
 
-fn draw_card_on_board(context: &mut DrawContext, card: Option<game::Card>, pos: BoardPosition) {
-    draw_card(context, card, (25 + (25 + 150) * (pos.x() as i32 + 2), 25 + (25 + 150) * (pos.y() as i32 + 2)));
+fn draw_armor(context: &mut DrawContext, armor: u8, (x, y): (i32, i32)) {
+    if armor > 0 {
+        draw_text(context, &format!("+{}", armor), Color::RGB(0xFF, 0xFF, 0xFF), (x + 20, y + 20 + 38));
+    }
+}
+
+fn draw_card_on_board(context: &mut DrawContext, game: &game::Game, pos: BoardPosition) {
+    let card = game.get_card_at(pos);
+    let (x, y) = (25 + (25 + 150) * (pos.x() as i32 + 2), 25 + (25 + 150) * (pos.y() as i32 + 2));
+    draw_card(context, card, (x, y));
+    draw_armor(context, game.get_armor_at(pos), (x, y));
 }
 
 pub fn main() {
@@ -110,6 +119,7 @@ pub fn main() {
     };
 
     'running: loop {
+        let mouse_state = event_pump.mouse_state();
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit {..} |
@@ -119,6 +129,13 @@ pub fn main() {
                 Event::KeyDown { keycode: Some(Keycode::Return), .. } => {
                     if game.drawn().is_none() {
                         game.draw().unwrap();
+                    }
+                },
+                Event::KeyDown { keycode: Some(Keycode::A), .. } => {
+                    if game.drawn().is_some() {
+                        translate_screen_to_board((mouse_state.x(), mouse_state.y())).map(|pos| {
+                            game.add_armor_at(pos).unwrap();
+                        });
                     }
                 },
                 Event::MouseButtonDown { x, y, mouse_btn: MouseButton::Left, .. } => {
@@ -171,7 +188,7 @@ pub fn main() {
         for x in -2..(2 + 1) {
             for y in -2..(2 + 1) {
                 if let Ok(pos) = BoardPosition::new((x, y)) {
-                    draw_card_on_board(&mut context, game.get_card_at(pos), pos);
+                    draw_card_on_board(&mut context, &game, pos);
                 }
             }
         }
