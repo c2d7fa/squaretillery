@@ -13,40 +13,48 @@ use sdl2::ttf::{Font};
 use game::{BoardPosition, Game, Card, Suit};
 use geometry::{align_text, HorizontalAlignment as AlignH, VerticalAlignment as AlignV};
 
+// TODO: We do integer conversions (mostly between i32 and u32) in a lot of
+// places. Is there a way to avoid that? Should we switch to safe conversions?
+
+const CARD_WIDTH: u32 = 150;
+const CARD_SPACE: i32 = 25;
+const CARD_FONT_HEIGHT: u16 = 40;
+const CARD_TEXT_MARGIN: i32 = 20;
+const ROYAL_BORDER_WIDTH: u32 = 10;
+const UI_FONT_HEIGHT: u16 = 25;
+const UI_SPACE: i32 = 8;
+const DRAW_PILE_POSITION: (i32, i32) = ((CARD_SPACE + CARD_WIDTH as i32) * 5 + CARD_SPACE, CARD_SPACE);
+
 fn translate_screen_to_board((x, y): (i32, i32)) -> Option<BoardPosition> {
-    let width = 150;
-    let margin = 25;
+    let board_x = x / (CARD_SPACE + CARD_WIDTH as i32) - 2;
+    let board_y = y / (CARD_SPACE + CARD_WIDTH as i32) - 2;
+    BoardPosition::new((board_x as i8, board_y as i8)).ok()
+}
 
-    let board_x = x / (margin + width) - 2;
-    let board_y = y / (margin + width) - 2;
-
-    BoardPosition::new((board_x as i8, board_y as i8)).ok()  // TODO: Use safe conversion
+fn translate_board_to_screen(pos: BoardPosition) -> (i32, i32) {
+    let screen_x = CARD_SPACE + (CARD_SPACE + CARD_WIDTH as i32) * (pos.x() as i32 + 2);
+    let screen_y = CARD_SPACE + (CARD_SPACE + CARD_WIDTH as i32) * (pos.y() as i32 + 2);
+    (screen_x, screen_y)
 }
 
 struct DrawContext<'a> {
     pub canvas: &'a mut WindowCanvas,
     pub texture_creator: &'a TextureCreator<WindowContext>,
-    pub font: &'a Font<'a, 'static>,
+    pub ui_font: &'a Font<'a, 'static>,
     pub card_font: &'a Font<'a, 'static>,
 }
 
-fn draw_text<'b>(context: &mut DrawContext, text: &'b str, color: Color, (x, y): (i32, i32)) {
-    let (w, h) = context.font.size_of(text).unwrap();
-    let text_surface = context.font.render(text).blended(color).unwrap();
+fn draw_text<'a>(context: &mut DrawContext, font: &'a Font<'a, 'static>, text: &'a str, color: Color, (x, y): (i32, i32)) {
+    let (w, h) = font.size_of(text).unwrap();
+    let text_surface = font.render(text).blended(color).unwrap();
     let text_texture = context.texture_creator.create_texture_from_surface(text_surface).unwrap();
     context.canvas.copy(&text_texture, None, Rect::new(x, y, w, h)).unwrap();
-//    context.canvas.set_draw_color(Color::RGB(0xFF, 0xFF, 0xFF));
-//    context.canvas.draw_rect(Rect::new(x, y, w, h)).unwrap();
 }
 
-// TODO: Clean up
-fn draw_card_text<'b>(context: &mut DrawContext, text: &'b str, color: Color, (x, y): (i32, i32)) {
-    let (w, h) = context.card_font.size_of(text).unwrap();
-    let text_surface = context.card_font.render(text).blended(color).unwrap();
-    let text_texture = context.texture_creator.create_texture_from_surface(text_surface).unwrap();
-    context.canvas.copy(&text_texture, None, Rect::new(x, y, w, h)).unwrap();
-//    context.canvas.set_draw_color(Color::RGB(0xFF, 0xFF, 0xFF));
-//    context.canvas.draw_rect(Rect::new(x, y, w, h)).unwrap();
+fn draw_text_align<'a>(context: &mut DrawContext, font: &'a Font<'a, 'static>, text: &'a str, color: Color,
+                       parent: Rect, horizontal_alignment: AlignH, vertical_alignment: AlignV, horizontal_margin: i32, vertical_margin: i32) {
+    let pos = align_text(font, text, parent, horizontal_alignment, vertical_alignment, horizontal_margin, vertical_margin);
+    draw_text(context, font, text, color, pos);
 }
 
 fn color_for_suit(suit: Suit) -> Color {
@@ -60,20 +68,28 @@ fn color_for_suit(suit: Suit) -> Color {
 }
 
 fn draw_card(context: &mut DrawContext, card: Option<Card>, (x, y): (i32, i32)) {
-    let rect = Rect::new(x, y, 150, 150);
+    let rect = Rect::new(x, y, CARD_WIDTH, CARD_WIDTH);
     match card {
         Some(card) => {
             let color = color_for_suit(card.suit());
             if card.is_royal() {
+                // Draw border
                 context.canvas.set_draw_color(Color::RGB(0xE0, 0xA8, 0x38));
                 context.canvas.fill_rect(rect).unwrap();
+                // Draw card
                 context.canvas.set_draw_color(color);
-                context.canvas.fill_rect(Rect::new(x + 8, y + 8, 150 - 16, 150 - 16)).unwrap();
+                context.canvas.fill_rect(Rect::new(
+                    x + ROYAL_BORDER_WIDTH as i32,
+                    y + ROYAL_BORDER_WIDTH as i32,
+                    CARD_WIDTH - (ROYAL_BORDER_WIDTH * 2),
+                    CARD_WIDTH - (ROYAL_BORDER_WIDTH * 2)
+                )).unwrap();
             } else {
                 context.canvas.set_draw_color(color);
                 context.canvas.fill_rect(rect).unwrap();
             }
-            draw_card_text(context, &format!("{}", card.value()), Color::RGB(0xFF, 0xFF, 0xFF), align_text(context.card_font, &format!("{}", card.value()), rect, AlignH::Left, AlignV::Top, 20, 20));
+            draw_text_align(context, context.card_font, &format!("{}", card.value()), Color::RGB(0xFF, 0xFF, 0xFF),
+                            rect, AlignH::Left, AlignV::Top, CARD_TEXT_MARGIN, CARD_TEXT_MARGIN);
         },
         None => {
             context.canvas.set_draw_color(Color::RGB(0xF2, 0xEB, 0xE8));
@@ -85,14 +101,15 @@ fn draw_card(context: &mut DrawContext, card: Option<Card>, (x, y): (i32, i32)) 
 
 fn draw_armor(context: &mut DrawContext, armor: u8, (x, y): (i32, i32)) {
     if armor > 0 {
-        let rect = Rect::new(x, y, 150, 150);
-        draw_text(context, &format!("+{}", armor), Color::RGB(0xFF, 0xFF, 0xFF), align_text(context.font, &format!("+{}", armor), rect, AlignH::Left, AlignV::Bottom, 20, 20));
+        let rect = Rect::new(x, y, CARD_WIDTH, CARD_WIDTH);
+        draw_text_align(context, context.ui_font, &format!("+{}", armor), Color::RGB(0xFF, 0xFF, 0xFF),
+                        rect, AlignH::Left, AlignV::Bottom, CARD_TEXT_MARGIN, CARD_TEXT_MARGIN);
     }
 }
 
 fn draw_card_on_board(context: &mut DrawContext, game: &Game, pos: BoardPosition) {
     let card = game.get_card_at(pos);
-    let (x, y) = (25 + (25 + 150) * (pos.x() as i32 + 2), 25 + (25 + 150) * (pos.y() as i32 + 2));
+    let (x, y) = translate_board_to_screen(pos);
     draw_card(context, card, (x, y));
     draw_armor(context, game.get_armor_at(pos), (x, y));
 }
@@ -108,10 +125,10 @@ pub fn main() {
     let video = sdl.video().unwrap();
     let ttf = sdl2::ttf::init().unwrap();
 
-    let font = ttf.load_font("./sansb.ttf", 22).unwrap();
-    let card_font = ttf.load_font("./sansb.ttf", 38).unwrap();
+    let ui_font = ttf.load_font("./sansb.ttf", UI_FONT_HEIGHT).unwrap();
+    let card_font = ttf.load_font("./sansb.ttf", CARD_FONT_HEIGHT).unwrap();
 
-    let window = video.window("Gridcannon", 900 + 150 + 25, 900)
+    let window = video.window("Gridcannon", (CARD_WIDTH + CARD_SPACE as u32) * 6 + CARD_SPACE as u32, (CARD_WIDTH + CARD_SPACE as u32) * 5 + CARD_SPACE as u32)
         .position_centered()
         .build().unwrap();
 
@@ -123,7 +140,7 @@ pub fn main() {
     let mut context = DrawContext {
         canvas: &mut canvas,
         texture_creator: &texture_creator,
-        font: &font,
+        ui_font: &ui_font,
         card_font: &card_font,
     };
 
@@ -153,10 +170,13 @@ pub fn main() {
                     }
                 },
                 Event::MouseButtonDown { x, y, mouse_btn: MouseButton::Left, .. } => {
-                    if y >= 25 && y <= 150 + 25 && x >= (25 + 150) * 5 + 25 && x <= (25 + 150) * 5 + 25 + 150 {
+                    if x >= DRAW_PILE_POSITION.0 &&
+                       x <= DRAW_PILE_POSITION.0 + CARD_WIDTH as i32 &&
+                       y >= DRAW_PILE_POSITION.1 &&
+                       y <= DRAW_PILE_POSITION.1 + CARD_WIDTH as i32 {
                         game.drawn().map(|card| {
                             dragged_card = Some(card);
-                            dragged_offset = Some((x - ((25 + 150) * 5 + 25), y - 25));
+                            dragged_offset = Some((x - DRAW_PILE_POSITION.0, y - DRAW_PILE_POSITION.1));
                         });
                     }
                 },
@@ -190,23 +210,25 @@ pub fn main() {
         // Render current (drawn) card
 
         if dragged_card.is_none() {
-            draw_card(&mut context, game.drawn(), ((25 + 150) * 5 + 25, 25));
+            draw_card(&mut context, game.drawn(), DRAW_PILE_POSITION);
         } else {
-            draw_card(&mut context, None, ((25 + 150) * 5 + 25, 25));
+            draw_card(&mut context, None, DRAW_PILE_POSITION);
         }
 
-        {
-            let pos = align_text(context.font, &format!("{} LEFT", game.cards_left()), Rect::new((25 + 150) * 5 + 25, 25 + 150, 150, 0), AlignH::Center, AlignV::Top, 0, 8);
-            draw_text(&mut context, &format!("{} LEFT", game.cards_left()), Color::RGB(0x82, 0x7B, 0x78), pos)
-        };
+        (|context: &mut DrawContext| {
+            draw_text_align(context, context.ui_font, &format!("{} LEFT", game.cards_left()), Color::RGB(0x82, 0x7B, 0x78),
+                            Rect::new(DRAW_PILE_POSITION.0, DRAW_PILE_POSITION.1 + CARD_WIDTH as i32, CARD_WIDTH, 0),
+                            AlignH::Center, AlignV::Top, 0, UI_SPACE);
+        })(&mut context);
 
         // Render shame
 
         if game.get_shame() > 0 {
-            {
-                let pos = align_text(context.font, &format!("{} SHAME", game.get_shame()), Rect::new((25 + 150) * 5 + 25, 25 + 150 + 8 + 22, 150, 0), AlignH::Center, AlignV::Top, 0, 8);
-                draw_text(&mut context, &format!("{} SHAME", game.get_shame()), Color::RGB(0xC2, 0x7B, 0x78), pos)
-            };
+            (|context: &mut DrawContext| {
+                draw_text_align(context, context.ui_font, &format!("{} SHAME", game.get_shame()), Color::RGB(0xC2, 0x7B, 0x78),
+                                Rect::new(DRAW_PILE_POSITION.0, DRAW_PILE_POSITION.1 + CARD_WIDTH as i32 + UI_SPACE + UI_FONT_HEIGHT as i32, CARD_WIDTH, 0),
+                                AlignH::Center, AlignV::Top, 0, UI_SPACE);
+            })(&mut context);
         }
 
         // Render board

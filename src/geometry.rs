@@ -13,20 +13,19 @@ pub fn align_text<'a>(font: &Font<'a, 'static>, text: &'a str, parent: Rect, hor
     use HorizontalAlignment::*;
     use VerticalAlignment::*;
 
-    let (tw_, th_) = font.size_of(text).unwrap_or((0, 0));
-    let (tw, th) = (tw_ as i32, th_ as i32);
-    let (px, py, pw, ph) = (parent.x(), parent.y(), parent.width() as i32, parent.height() as i32);
+    let (tw, th) = font.size_of(text).unwrap_or((0, 0));
+    let (px, py, pw, ph) = (parent.x(), parent.y(), parent.width(), parent.height());
 
     let x = match horizontal_alignment {
         Left => px + horizontal_margin,
-        Center => px + (pw - tw) / 2 - 1,  // Margin ignored
-        Right => px + pw - tw - horizontal_margin,
+        Center => px + (pw - tw) as i32 / 2,  // Margin ignored
+        Right => px + (pw - tw) as i32 - horizontal_margin,
     };
 
     let y = match vertical_alignment {
         Top => py + vertical_margin,
-        Middle => py + (ph - th) / 2,
-        Bottom => py + ph - th - vertical_margin,  // Margin ignored
+        Middle => py + (ph - th) as i32 / 2,
+        Bottom => py + (ph - th) as i32 - vertical_margin,  // Margin ignored
     };
 
     (x, y)
