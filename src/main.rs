@@ -173,7 +173,7 @@ pub fn main() {
     let ui_font = ttf.load_font("./sansb.ttf", UI_FONT_HEIGHT).unwrap();
     let card_font = ttf.load_font("./sansb.ttf", CARD_FONT_HEIGHT).unwrap();
 
-    let window = video.window("Gridcannon", (CARD_WIDTH + CARD_SPACE as u32) * 6 + CARD_SPACE as u32, (CARD_WIDTH + CARD_SPACE as u32) * 5 + CARD_SPACE as u32)
+    let window = video.window("Squaretillery", (CARD_WIDTH + CARD_SPACE as u32) * 6 + CARD_SPACE as u32, (CARD_WIDTH + CARD_SPACE as u32) * 5 + CARD_SPACE as u32)
         .position_centered()
         .build().unwrap();
 
