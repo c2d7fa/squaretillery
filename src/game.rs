@@ -233,8 +233,17 @@ impl Game {
         if self.drawn.is_none() {
             Err("Cannot place card because there is no drawn card.".to_string())
         } else {
-            self.board.place_card_at(pos, self.drawn.unwrap());
-            self.drawn = None;
+            let card = self.get_card_at(pos);
+            if card.is_some() && card.unwrap().is_royal() {
+                self.add_armor_at(pos);
+            } else if self.drawn.unwrap().value() == 1 {
+                self.move_pile_to_bottom_of_deck_at(pos);
+                self.board.place_card_at(pos, self.drawn.unwrap());
+                self.drawn = None;
+            } else {
+                self.board.place_card_at(pos, self.drawn.unwrap());
+                self.drawn = None;
+            }
             Ok(())
         }
     }

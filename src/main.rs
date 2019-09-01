@@ -200,13 +200,6 @@ pub fn main() {
                         game.draw().unwrap();
                     }
                 },
-                Event::KeyDown { keycode: Some(Keycode::A), .. } => {
-                    if game.drawn().is_some() {
-                        translate_screen_to_board((mouse_state.x(), mouse_state.y())).map(|pos| {
-                            game.add_armor_at(pos).unwrap();
-                        });
-                    }
-                },
                 Event::KeyDown { keycode: Some(Keycode::S), .. } => {
                     if game.drawn().is_some() {
                         game.add_to_shame_pile();
