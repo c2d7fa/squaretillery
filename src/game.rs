@@ -1,15 +1,16 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Suit {
     Spades,
     Hearts,
     Clubs,
     Diamonds,
+    Joker,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Card {
     suit: Suit,
-    value: u8,
+    value: u8,  // NOTE: Not used when suit is Joker.
 }
 
 #[derive(Debug)]
@@ -34,7 +35,9 @@ pub struct Game {
 // TODO: Jokers
 impl Card {
     pub fn new(value: u8, suit: Suit) -> Result<Card, String> {
-        if !(value >= 1 && value <= 13) { return Err(format!("{} is not a valid value for card (must be between 1 and 13).", value)) };
+        if value == 0 && suit != Suit::Joker { return Err("Only jokers can have value 0.".to_string()); }
+        if value != 0 && suit == Suit::Joker { return Err("Jokers must have value 0.".to_string()); }
+        if value > 13 { return Err("Card value cannot be greater than 13.".to_string()); }
 
         Ok(Card { suit, value })
     }
@@ -61,6 +64,8 @@ impl Pile {
                 cards.push(Card::new(value, suit).unwrap());
             }
         }
+        cards.push(Card::new(0, Suit::Joker).unwrap());
+        cards.push(Card::new(0, Suit::Joker).unwrap());
 
         cards.shuffle(&mut rand::thread_rng());
 
@@ -235,8 +240,8 @@ impl Game {
         } else {
             let card = self.get_card_at(pos);
             if card.is_some() && card.unwrap().is_royal() {
-                self.add_armor_at(pos);
-            } else if self.drawn.unwrap().value() == 1 {
+                self.add_armor_at(pos).unwrap();
+            } else if self.drawn.unwrap().value() == 1 || self.drawn.unwrap().value() == 0 {
                 self.move_pile_to_bottom_of_deck_at(pos);
                 self.board.place_card_at(pos, self.drawn.unwrap());
                 self.drawn = None;

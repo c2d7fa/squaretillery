@@ -65,6 +65,7 @@ fn color_for_suit(suit: Suit, is_active: bool) -> Color {
             Diamonds => { Color::RGB(0xC8, 0x78, 0x60) },
             Spades => { Color::RGB(0x60, 0x60, 0xD0) },
             Clubs => { Color::RGB(0x60, 0x90, 0xB8) },
+            Joker => { Color::RGB(0x40, 0x40, 0x40) },
         }
     } else {
         match suit {
@@ -72,6 +73,7 @@ fn color_for_suit(suit: Suit, is_active: bool) -> Color {
             Diamonds => { Color::RGB(0xC8, 0xB2, 0xAA) },
             Spades => { Color::RGB(0xB0, 0xB0, 0xD0) },
             Clubs => { Color::RGB(0xA0, 0xB2, 0xC8) },
+            Joker => { Color::RGB(0xA0, 0xA0, 0xA0) },
         }
     }
 }
@@ -188,7 +190,6 @@ pub fn main() {
     };
 
     'running: loop {
-        let mouse_state = event_pump.mouse_state();
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit {..} |
