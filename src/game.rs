@@ -198,6 +198,33 @@ impl Game {
         self.deck.place_pile_on_top(royals_pile);
     }
 
+    pub fn can_place_at(&self, pos: BoardPosition) -> bool {
+        // TODO: We should probably clean up this code a litte bit...
+        // TODO: Allow placing a normal card on a royal with the meaning of
+        // adding armor to that royal.
+        if self.drawn.is_none() {
+            false
+        } else {
+            let drawn = self.drawn.unwrap();
+            if drawn.is_royal() {
+                if pos.x() >= -1 && pos.x() <= 1 && pos.y() >= -1 && pos.y() <= 1 { false }
+                else if self.get_card_at(pos).is_some() { false }
+                else { true } // TODO
+            } else {
+                if pos.x() >= -1 && pos.x() <= 1 && pos.y() >= -1 && pos.y() <= 1 {
+                    match self.get_card_at(pos) {
+                        None => true,
+                        Some(card) => {
+                            drawn.value() == 1 || drawn.value() >= card.value()
+                        },
+                    }
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
     pub fn get_card_at(&self, pos: BoardPosition) -> Option<Card> {
         self.board.get_card_at(pos)
     }

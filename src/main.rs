@@ -57,13 +57,22 @@ fn draw_text_align<'a>(context: &mut DrawContext, font: &'a Font<'a, 'static>, t
     draw_text(context, font, text, color, pos);
 }
 
-fn color_for_suit(suit: Suit) -> Color {
+fn color_for_suit(suit: Suit, is_active: bool) -> Color {
     use Suit::*;
-    match suit {
-        Hearts => { Color::RGB(0xD0, 0x60, 0x60) },
-        Diamonds => { Color::RGB(0xC8, 0x78, 0x60) },
-        Spades => { Color::RGB(0x60, 0x60, 0xD0) },
-        Clubs => { Color::RGB(0x60, 0x90, 0xB8) },
+    if is_active {
+        match suit {
+            Hearts => { Color::RGB(0xD0, 0x60, 0x60) },
+            Diamonds => { Color::RGB(0xC8, 0x78, 0x60) },
+            Spades => { Color::RGB(0x60, 0x60, 0xD0) },
+            Clubs => { Color::RGB(0x60, 0x90, 0xB8) },
+        }
+    } else {
+        match suit {
+            Hearts => { Color::RGB(0xD0, 0xB0, 0xB0) },
+            Diamonds => { Color::RGB(0xC8, 0xB2, 0xAA) },
+            Spades => { Color::RGB(0xB0, 0xB0, 0xD0) },
+            Clubs => { Color::RGB(0xA0, 0xB2, 0xC8) },
+        }
     }
 }
 
@@ -71,7 +80,7 @@ fn draw_card(context: &mut DrawContext, card: Option<Card>, (x, y): (i32, i32)) 
     let rect = Rect::new(x, y, CARD_WIDTH, CARD_WIDTH);
     match card {
         Some(card) => {
-            let color = color_for_suit(card.suit());
+            let color = color_for_suit(card.suit(), true);
             if card.is_royal() {
                 // Draw border
                 context.canvas.set_draw_color(Color::RGB(0xE0, 0xA8, 0x38));
@@ -92,8 +101,38 @@ fn draw_card(context: &mut DrawContext, card: Option<Card>, (x, y): (i32, i32)) 
                             rect, AlignH::Left, AlignV::Top, CARD_TEXT_MARGIN, CARD_TEXT_MARGIN);
         },
         None => {
-            context.canvas.set_draw_color(Color::RGB(0xF2, 0xEB, 0xE8));
             context.canvas.set_draw_color(Color::RGB(0xE2, 0xDB, 0xD8));
+            context.canvas.fill_rect(rect).unwrap();
+        },
+    }
+}
+
+fn draw_inactive_card(context: &mut DrawContext, card: Option<Card>, (x, y): (i32, i32)) {
+    let rect = Rect::new(x, y, CARD_WIDTH, CARD_WIDTH);
+    match card {
+        Some(card) => {
+            let color = color_for_suit(card.suit(), false);
+            if card.is_royal() {
+                // Draw border
+                context.canvas.set_draw_color(Color::RGB(0xE0, 0xC8, 0xB8));
+                context.canvas.fill_rect(rect).unwrap();
+                // Draw card
+                context.canvas.set_draw_color(color);
+                context.canvas.fill_rect(Rect::new(
+                    x + ROYAL_BORDER_WIDTH as i32,
+                    y + ROYAL_BORDER_WIDTH as i32,
+                    CARD_WIDTH - (ROYAL_BORDER_WIDTH * 2),
+                    CARD_WIDTH - (ROYAL_BORDER_WIDTH * 2)
+                )).unwrap();
+            } else {
+                context.canvas.set_draw_color(color);
+                context.canvas.fill_rect(rect).unwrap();
+            }
+            draw_text_align(context, context.card_font, &format!("{}", card.value()), Color::RGB(0xFF, 0xFF, 0xFF),
+                            rect, AlignH::Left, AlignV::Top, CARD_TEXT_MARGIN, CARD_TEXT_MARGIN);
+        },
+        None => {
+            context.canvas.set_draw_color(Color::RGB(0xED, 0xE8, 0xE4));
             context.canvas.fill_rect(rect).unwrap();
         },
     }
@@ -107,10 +146,14 @@ fn draw_armor(context: &mut DrawContext, armor: u8, (x, y): (i32, i32)) {
     }
 }
 
-fn draw_card_on_board(context: &mut DrawContext, game: &Game, pos: BoardPosition) {
+fn draw_card_on_board(context: &mut DrawContext, game: &Game, pos: BoardPosition, draw_placability: bool) {
     let card = game.get_card_at(pos);
     let (x, y) = translate_board_to_screen(pos);
-    draw_card(context, card, (x, y));
+    if draw_placability && !game.can_place_at(pos) {
+        draw_inactive_card(context, card, (x, y));
+    } else {
+        draw_card(context, card, (x, y));
+    }
     draw_armor(context, game.get_armor_at(pos), (x, y));
 }
 
@@ -236,7 +279,7 @@ pub fn main() {
         for x in -2..(2 + 1) {
             for y in -2..(2 + 1) {
                 if let Ok(pos) = BoardPosition::new((x, y)) {
-                    draw_card_on_board(&mut context, &game, pos);
+                    draw_card_on_board(&mut context, &game, pos, dragged_card.is_some());
                 }
             }
         }
