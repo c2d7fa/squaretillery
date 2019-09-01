@@ -1,3 +1,6 @@
+mod game;
+mod geometry;
+
 use sdl2::pixels::Color;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -7,8 +10,8 @@ use sdl2::video::WindowContext;
 use sdl2::mouse::MouseButton;
 use sdl2::ttf::{Font};
 
-mod game;
-use game::{BoardPosition};
+use game::{BoardPosition, Game, Card, Suit};
+use geometry::{align_text, HorizontalAlignment as AlignH, VerticalAlignment as AlignV};
 
 fn translate_screen_to_board((x, y): (i32, i32)) -> Option<BoardPosition> {
     let width = 150;
@@ -32,6 +35,8 @@ fn draw_text<'b>(context: &mut DrawContext, text: &'b str, color: Color, (x, y):
     let text_surface = context.font.render(text).blended(color).unwrap();
     let text_texture = context.texture_creator.create_texture_from_surface(text_surface).unwrap();
     context.canvas.copy(&text_texture, None, Rect::new(x, y, w, h)).unwrap();
+//    context.canvas.set_draw_color(Color::RGB(0xFF, 0xFF, 0xFF));
+//    context.canvas.draw_rect(Rect::new(x, y, w, h)).unwrap();
 }
 
 // TODO: Clean up
@@ -40,18 +45,21 @@ fn draw_card_text<'b>(context: &mut DrawContext, text: &'b str, color: Color, (x
     let text_surface = context.card_font.render(text).blended(color).unwrap();
     let text_texture = context.texture_creator.create_texture_from_surface(text_surface).unwrap();
     context.canvas.copy(&text_texture, None, Rect::new(x, y, w, h)).unwrap();
+//    context.canvas.set_draw_color(Color::RGB(0xFF, 0xFF, 0xFF));
+//    context.canvas.draw_rect(Rect::new(x, y, w, h)).unwrap();
 }
 
-fn color_for_suit(suit: game::Suit) -> Color {
+fn color_for_suit(suit: Suit) -> Color {
+    use Suit::*;
     match suit {
-        game::Suit::Hearts => { Color::RGB(0xD0, 0x60, 0x60) },
-        game::Suit::Diamonds => { Color::RGB(0xC8, 0x78, 0x60) },
-        game::Suit::Spades => { Color::RGB(0x60, 0x60, 0xD0) },
-        game::Suit::Clubs => { Color::RGB(0x60, 0x90, 0xB8) },
+        Hearts => { Color::RGB(0xD0, 0x60, 0x60) },
+        Diamonds => { Color::RGB(0xC8, 0x78, 0x60) },
+        Spades => { Color::RGB(0x60, 0x60, 0xD0) },
+        Clubs => { Color::RGB(0x60, 0x90, 0xB8) },
     }
 }
 
-fn draw_card(context: &mut DrawContext, card: Option<game::Card>, (x, y): (i32, i32)) {
+fn draw_card(context: &mut DrawContext, card: Option<Card>, (x, y): (i32, i32)) {
     let rect = Rect::new(x, y, 150, 150);
     match card {
         Some(card) => {
@@ -65,7 +73,7 @@ fn draw_card(context: &mut DrawContext, card: Option<game::Card>, (x, y): (i32, 
                 context.canvas.set_draw_color(color);
                 context.canvas.fill_rect(rect).unwrap();
             }
-            draw_card_text(context, &format!("{}", card.value()), Color::RGB(0xFF, 0xFF, 0xFF), (rect.x() + 20, rect.y() + 20));
+            draw_card_text(context, &format!("{}", card.value()), Color::RGB(0xFF, 0xFF, 0xFF), align_text(context.card_font, &format!("{}", card.value()), rect, AlignH::Left, AlignV::Top, 20, 20));
         },
         None => {
             context.canvas.set_draw_color(Color::RGB(0xF2, 0xEB, 0xE8));
@@ -77,11 +85,12 @@ fn draw_card(context: &mut DrawContext, card: Option<game::Card>, (x, y): (i32, 
 
 fn draw_armor(context: &mut DrawContext, armor: u8, (x, y): (i32, i32)) {
     if armor > 0 {
-        draw_text(context, &format!("+{}", armor), Color::RGB(0xFF, 0xFF, 0xFF), (x + 20, y + 20 + 38));
+        let rect = Rect::new(x, y, 150, 150);
+        draw_text(context, &format!("+{}", armor), Color::RGB(0xFF, 0xFF, 0xFF), align_text(context.font, &format!("+{}", armor), rect, AlignH::Left, AlignV::Bottom, 20, 20));
     }
 }
 
-fn draw_card_on_board(context: &mut DrawContext, game: &game::Game, pos: BoardPosition) {
+fn draw_card_on_board(context: &mut DrawContext, game: &Game, pos: BoardPosition) {
     let card = game.get_card_at(pos);
     let (x, y) = (25 + (25 + 150) * (pos.x() as i32 + 2), 25 + (25 + 150) * (pos.y() as i32 + 2));
     draw_card(context, card, (x, y));
@@ -89,10 +98,10 @@ fn draw_card_on_board(context: &mut DrawContext, game: &game::Game, pos: BoardPo
 }
 
 pub fn main() {
-    let mut game = game::Game::new();
+    let mut game = Game::new();
     game.set_up();
 
-    let mut dragged_card: Option<game::Card> = None;
+    let mut dragged_card: Option<Card> = None;
     let mut dragged_offset: Option<(i32, i32)> = None;
 
     let sdl = sdl2::init().unwrap();
@@ -186,12 +195,18 @@ pub fn main() {
             draw_card(&mut context, None, ((25 + 150) * 5 + 25, 25));
         }
 
-        draw_text(&mut context, &format!("{} LEFT", game.cards_left()), Color::RGB(0x82, 0x7B, 0x78), ((25 + 150) * 5 + 25, 25 + 150 + 8));
+        {
+            let pos = align_text(context.font, &format!("{} LEFT", game.cards_left()), Rect::new((25 + 150) * 5 + 25, 25 + 150, 150, 0), AlignH::Center, AlignV::Top, 0, 8);
+            draw_text(&mut context, &format!("{} LEFT", game.cards_left()), Color::RGB(0x82, 0x7B, 0x78), pos)
+        };
 
         // Render shame
 
         if game.get_shame() > 0 {
-            draw_text(&mut context, &format!("{} SHAME", game.get_shame()), Color::RGB(0xC2, 0x7B, 0x78), ((25 + 150) * 5 + 25, 25 + 150 + 8 + 22 + 8));
+            {
+                let pos = align_text(context.font, &format!("{} SHAME", game.get_shame()), Rect::new((25 + 150) * 5 + 25, 25 + 150 + 8 + 22, 150, 0), AlignH::Center, AlignV::Top, 0, 8);
+                draw_text(&mut context, &format!("{} SHAME", game.get_shame()), Color::RGB(0xC2, 0x7B, 0x78), pos)
+            };
         }
 
         // Render board
