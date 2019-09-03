@@ -7,7 +7,7 @@ use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
 use sdl2::render::{TextureCreator, WindowCanvas};
 use sdl2::video::WindowContext;
-use sdl2::mouse::MouseButton;
+use sdl2::mouse::{MouseButton, Cursor, SystemCursor};
 use sdl2::ttf::{Font};
 
 use game::{BoardPosition, Game, Card, Suit};
@@ -175,9 +175,12 @@ pub fn main() {
 
     let window = video.window("Squaretillery", (CARD_WIDTH + CARD_SPACE as u32) * 6 + CARD_SPACE as u32, (CARD_WIDTH + CARD_SPACE as u32) * 5 + CARD_SPACE as u32)
         .position_centered()
+        //.allow_highdpi()
         .build().unwrap();
 
-    let mut canvas = window.into_canvas().build().unwrap();
+    let mut canvas = window.into_canvas()
+        //.present_vsync()
+        .build().unwrap();
     let texture_creator = canvas.texture_creator();
 
     let mut event_pump = sdl.event_pump().unwrap();
@@ -189,17 +192,15 @@ pub fn main() {
         card_font: &card_font,
     };
 
+    let cursor_default = Cursor::from_system(SystemCursor::Arrow).unwrap();
+    let cursor_hand = Cursor::from_system(SystemCursor::Hand).unwrap();
+
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit {..} |
                 Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                     break 'running
-                },
-                Event::KeyDown { keycode: Some(Keycode::Return), .. } => {
-                    if game.drawn().is_none() {
-                        game.draw().unwrap();
-                    }
                 },
                 Event::KeyDown { keycode: Some(Keycode::S), .. } => {
                     if game.drawn().is_some() {
@@ -208,13 +209,16 @@ pub fn main() {
                 },
                 Event::MouseButtonDown { x, y, mouse_btn: MouseButton::Left, .. } => {
                     if x >= DRAW_PILE_POSITION.0 &&
-                       x <= DRAW_PILE_POSITION.0 + CARD_WIDTH as i32 &&
-                       y >= DRAW_PILE_POSITION.1 &&
-                       y <= DRAW_PILE_POSITION.1 + CARD_WIDTH as i32 {
-                        game.drawn().map(|card| {
+                        x <= DRAW_PILE_POSITION.0 + CARD_WIDTH as i32 &&
+                        y >= DRAW_PILE_POSITION.1 &&
+                        y <= DRAW_PILE_POSITION.1 + CARD_WIDTH as i32
+                    {
+                        if let Some(card) = game.drawn() {
                             dragged_card = Some(card);
                             dragged_offset = Some((x - DRAW_PILE_POSITION.0, y - DRAW_PILE_POSITION.1));
-                        });
+                        } else {
+                            game.draw().unwrap();
+                        }
                     }
                 },
                 Event::MouseButtonUp { x, y, mouse_btn: MouseButton::Left, .. } => {
@@ -241,8 +245,27 @@ pub fn main() {
             }
         }
 
+
         context.canvas.set_draw_color(Color::RGB(0xF2, 0xEB, 0xE8));
         context.canvas.clear();
+
+        // Change mouse cursor
+        let (mouse_x, mouse_y) = {
+            let mouse_state = event_pump.mouse_state();
+            (mouse_state.x(), mouse_state.y())
+        };
+
+        if mouse_x >= DRAW_PILE_POSITION.0 &&
+            mouse_x <= DRAW_PILE_POSITION.0 + CARD_WIDTH as i32 &&
+            mouse_y >= DRAW_PILE_POSITION.1 &&
+            mouse_y <= DRAW_PILE_POSITION.1 + CARD_WIDTH as i32 &&
+            game.drawn().is_none()
+        {
+            // Cursor is on draw pile and there is no card drawn.
+            cursor_hand.set();
+        } else {
+            cursor_default.set();
+        }
 
         // Render current (drawn) card
 
