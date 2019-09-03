@@ -1,10 +1,12 @@
 use sdl2::rect::Rect;
 use sdl2::ttf::Font;
 
+#[allow(dead_code)]
 pub enum HorizontalAlignment {
     Left, Center, Right,
 }
 
+#[allow(dead_code)]
 pub enum VerticalAlignment {
     Top, Middle, Bottom,
 }
