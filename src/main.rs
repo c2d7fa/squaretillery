@@ -159,6 +159,13 @@ fn draw_card_on_board(context: &mut DrawContext, game: &Game, pos: BoardPosition
     draw_armor(context, game.get_armor_at(pos), (x, y));
 }
 
+fn inside_draw_pile((x, y): (i32, i32)) -> bool {
+    x >= DRAW_PILE_POSITION.0 &&
+        x <= DRAW_PILE_POSITION.0 + CARD_WIDTH as i32 &&
+        y >= DRAW_PILE_POSITION.1 &&
+        y <= DRAW_PILE_POSITION.1 + CARD_WIDTH as i32
+}
+
 pub fn main() {
     let mut game = Game::new();
     game.set_up();
@@ -202,17 +209,8 @@ pub fn main() {
                 Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                     break 'running
                 },
-                Event::KeyDown { keycode: Some(Keycode::S), .. } => {
-                    if game.drawn().is_some() {
-                        game.add_to_shame_pile();
-                    }
-                },
                 Event::MouseButtonDown { x, y, mouse_btn: MouseButton::Left, .. } => {
-                    if x >= DRAW_PILE_POSITION.0 &&
-                        x <= DRAW_PILE_POSITION.0 + CARD_WIDTH as i32 &&
-                        y >= DRAW_PILE_POSITION.1 &&
-                        y <= DRAW_PILE_POSITION.1 + CARD_WIDTH as i32
-                    {
+                    if inside_draw_pile((x, y)) {
                         if let Some(card) = game.drawn() {
                             dragged_card = Some(card);
                             dragged_offset = Some((x - DRAW_PILE_POSITION.0, y - DRAW_PILE_POSITION.1));
@@ -237,31 +235,29 @@ pub fn main() {
                     });
                 },
                 Event::MouseButtonUp { x, y, mouse_btn: MouseButton::Right, .. } => {
-                    translate_screen_to_board((x, y)).map(|pos| {
-                        game.move_pile_to_bottom_of_deck_at(pos)
-                    });
+                    if inside_draw_pile((x, y)) && game.drawn().is_some() {
+                        game.add_to_shame_pile();
+                    } else {
+                        translate_screen_to_board((x, y)).map(|pos| {
+                            game.move_pile_to_bottom_of_deck_at(pos)
+                        });
+                    }
                 },
                 _ => {}
             }
         }
 
-
         context.canvas.set_draw_color(Color::RGB(0xF2, 0xEB, 0xE8));
         context.canvas.clear();
 
-        // Change mouse cursor
+        // Update mouse cursor
+
         let (mouse_x, mouse_y) = {
             let mouse_state = event_pump.mouse_state();
             (mouse_state.x(), mouse_state.y())
         };
 
-        if mouse_x >= DRAW_PILE_POSITION.0 &&
-            mouse_x <= DRAW_PILE_POSITION.0 + CARD_WIDTH as i32 &&
-            mouse_y >= DRAW_PILE_POSITION.1 &&
-            mouse_y <= DRAW_PILE_POSITION.1 + CARD_WIDTH as i32 &&
-            game.drawn().is_none()
-        {
-            // Cursor is on draw pile and there is no card drawn.
+        if inside_draw_pile((mouse_x, mouse_y)) && game.drawn().is_none() {
             cursor_hand.set();
         } else {
             cursor_default.set();
