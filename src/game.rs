@@ -32,7 +32,6 @@ pub struct Game {
     shame: u8,
 }
 
-// TODO: Jokers
 impl Card {
     pub fn new(value: u8, suit: Suit) -> Result<Card, String> {
         if value == 0 && suit != Suit::Joker { return Err("Only jokers can have value 0.".to_string()); }
