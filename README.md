@@ -15,5 +15,6 @@ To run it, make sure that Rust is installed and `cargo` is available and enter t
 
 Other implementations of this game include the following:
 
+* [Kill the Royals](https://palparepa.github.io/gridcannon/) by [palparepa](https://github.com/palparepa)
 * [Cardcannon](https://sampiper.itch.io/cardcannon) by [Sam Piper](https://twitter.com/Reki_SamPiper)
 * [Gridcannon](https://herebemike.github.io/Gridcannon/site/) by [@HereBeMike](https://twitter.com/HereBeMike)
