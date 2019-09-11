@@ -156,11 +156,12 @@ impl BoardPosition {
     }
 
     pub fn adjacent_edges(&self) -> Vec<BoardPosition> {
+        // TODO: Clean this up
         let mut result = vec![];
-        BoardPosition::new((self.x - 1, self.y)).map(|pos| { if pos.is_edge() { result.push(pos) } });
-        BoardPosition::new((self.x + 1, self.y)).map(|pos| { if pos.is_edge() { result.push(pos) } });
-        BoardPosition::new((self.x, self.y - 1)).map(|pos| { if pos.is_edge() { result.push(pos) } });
-        BoardPosition::new((self.x, self.y + 1)).map(|pos| { if pos.is_edge() { result.push(pos) } });
+        BoardPosition::new((self.x - 1, self.y)).map(|pos| { if pos.is_edge() { result.push(pos) } }).unwrap_or(());
+        BoardPosition::new((self.x + 1, self.y)).map(|pos| { if pos.is_edge() { result.push(pos) } }).unwrap_or(());
+        BoardPosition::new((self.x, self.y - 1)).map(|pos| { if pos.is_edge() { result.push(pos) } }).unwrap_or(());
+        BoardPosition::new((self.x, self.y + 1)).map(|pos| { if pos.is_edge() { result.push(pos) } }).unwrap_or(());
         result
     }
 
