@@ -81,6 +81,17 @@ fn color_for_suit(suit: Suit, is_active: bool) -> Color {
 fn draw_card(context: &mut DrawContext, card: Option<Card>, (x, y): (i32, i32)) {
     let rect = Rect::new(x, y, CARD_WIDTH, CARD_WIDTH);
     match card {
+        Some(card) => { draw_active_card(context, Some(card), (x, y)) },
+        None => {
+            context.canvas.set_draw_color(Color::RGB(0xE2, 0xDB, 0xD8));
+            context.canvas.fill_rect(rect).unwrap();
+        },
+    }
+}
+
+fn draw_active_card(context: &mut DrawContext, card: Option<Card>, (x, y): (i32, i32)) {
+    let rect = Rect::new(x, y, CARD_WIDTH, CARD_WIDTH);
+    match card {
         Some(card) => {
             let color = color_for_suit(card.suit(), true);
             if card.is_royal() {
@@ -103,7 +114,7 @@ fn draw_card(context: &mut DrawContext, card: Option<Card>, (x, y): (i32, i32)) 
                             rect, AlignH::Left, AlignV::Top, CARD_TEXT_MARGIN, CARD_TEXT_MARGIN);
         },
         None => {
-            context.canvas.set_draw_color(Color::RGB(0xE2, 0xDB, 0xD8));
+            context.canvas.set_draw_color(Color::RGB(0xD2, 0xCB, 0xC8));
             context.canvas.fill_rect(rect).unwrap();
         },
     }
@@ -151,8 +162,12 @@ fn draw_armor(context: &mut DrawContext, armor: u8, (x, y): (i32, i32)) {
 fn draw_card_on_board(context: &mut DrawContext, game: &Game, pos: BoardPosition, draw_placability: bool) {
     let card = game.get_card_at(pos);
     let (x, y) = translate_board_to_screen(pos);
-    if draw_placability && !game.can_place_at(pos) {
-        draw_inactive_card(context, card, (x, y));
+    if draw_placability {
+        if game.can_place_at(pos) {
+            draw_active_card(context, card, (x, y));
+        } else {
+            draw_inactive_card(context, card, (x, y));
+        }
     } else {
         draw_card(context, card, (x, y));
     }
