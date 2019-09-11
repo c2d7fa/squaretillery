@@ -7,6 +7,15 @@ pub enum Suit {
     Joker,
 }
 
+impl Suit {
+    fn is_same_color_as(self, other: Suit) -> bool {
+        use Suit::*;
+        if self == Spades || self == Clubs { other == Spades || other == Clubs }
+        else if self == Hearts || self == Diamonds { other == Hearts || other == Diamonds }
+        else { false }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Card {
     suit: Suit,
@@ -100,7 +109,7 @@ impl Pile {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct BoardPosition {
     x: i8,
     y: i8,
@@ -144,6 +153,15 @@ impl BoardPosition {
     // false otherwise.
     pub fn is_edge(&self) -> bool {
         !self.is_cannon()
+    }
+
+    pub fn adjacent_edges(&self) -> Vec<BoardPosition> {
+        let mut result = vec![];
+        BoardPosition::new((self.x - 1, self.y)).map(|pos| { if pos.is_edge() { result.push(pos) } });
+        BoardPosition::new((self.x + 1, self.y)).map(|pos| { if pos.is_edge() { result.push(pos) } });
+        BoardPosition::new((self.x, self.y - 1)).map(|pos| { if pos.is_edge() { result.push(pos) } });
+        BoardPosition::new((self.x, self.y + 1)).map(|pos| { if pos.is_edge() { result.push(pos) } });
+        result
     }
 
     pub fn x(&self) -> i8 { self.x }
@@ -206,6 +224,57 @@ impl Board {
     pub fn get_armor_at(&self, pos: BoardPosition) -> u8 {
         self.armor[(2 + pos.x()) as usize][(2 + pos.y()) as usize]
     }
+
+    fn adjacent_empty_edges(&self, pos: BoardPosition) -> Vec<BoardPosition> {
+        let mut result = vec![];
+        for adj in pos.adjacent_edges() {
+            if self.get_card_at(adj).is_none() { result.push(adj) }
+        }
+        result
+    }
+
+    // TODO: Error checking
+    pub fn find_valid_royal_placement_positions(&self, royal: Card) -> Vec<BoardPosition> {
+        let mut result = vec![];
+
+        #[derive(PartialEq, Eq, PartialOrd, Ord)]
+        enum SuitSimilarity { None, Color, Suit };
+
+        let mut best_suit_similarity = SuitSimilarity::None;
+        let mut best_value = 0;
+
+        for pos in BoardPosition::all_valid() {
+            if !pos.is_outer_cannon() { continue }
+
+            if self.adjacent_empty_edges(pos).is_empty() { continue }
+
+            let suit_similarity = {
+                if self.get_card_at(pos).unwrap().suit() == royal.suit() { SuitSimilarity::Suit }
+                else if self.get_card_at(pos).unwrap().suit().is_same_color_as(royal.suit()) { SuitSimilarity::Color }
+                else { SuitSimilarity::None }
+            };
+            let value = self.get_card_at(pos).unwrap().value();
+
+            if suit_similarity < best_suit_similarity { continue }
+            else if suit_similarity == best_suit_similarity { /* Do nothing */ }
+            else {
+                best_suit_similarity = suit_similarity;
+                result.clear();
+                best_value = value;
+            }
+
+            if value < best_value { continue }
+            else if value == best_value { /* Do nothing */ }
+            else {
+                result.clear();
+                best_value = value;
+            }
+
+            for adj in self.adjacent_empty_edges(pos) { result.push(adj) }
+        }
+
+        result
+    }
 }
 
 impl Game {
@@ -239,9 +308,7 @@ impl Game {
         } else {
             let drawn = self.drawn.unwrap();
             if drawn.is_royal() {
-                if pos.is_cannon() { false }
-                else if self.get_card_at(pos).is_some() { false }
-                else { true } // TODO
+                self.board.find_valid_royal_placement_positions(drawn).contains(&pos)
             } else {
                 if pos.is_cannon() {
                     match self.get_card_at(pos) {
