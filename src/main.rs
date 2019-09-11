@@ -289,12 +289,8 @@ pub fn main() {
 
         // Render board
 
-        for x in -2..(2 + 1) {
-            for y in -2..(2 + 1) {
-                if let Ok(pos) = BoardPosition::new((x, y)) {
-                    draw_card_on_board(&mut context, &game, pos, dragged_card.is_some());
-                }
-            }
+        for pos in BoardPosition::all_valid() {
+            draw_card_on_board(&mut context, &game, pos, dragged_card.is_some());
         }
 
         // Render card being dragged

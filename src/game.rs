@@ -117,6 +117,35 @@ impl BoardPosition {
         Ok(BoardPosition { x, y })
     }
 
+    pub fn all_valid() -> Vec<BoardPosition> {
+        let mut result = vec![];
+        for x in -2..(2 + 1) {
+            for y in -2..(2 + 1) {
+                if let Ok(pos) = Self::new((x, y)) {
+                    result.push(pos);
+                }
+            }
+        }
+        result
+    }
+
+    // Return true if self is part of the middle 3x3 grid, false otherwise.
+    pub fn is_cannon(&self) -> bool {
+        (self.x >= -1 && self.x <= 1) && (self.y >= -1 && self.y <= 1)
+    }
+
+    // Return true if self is part of the outer edge of the cannon; that is, if
+    // it is not the center card and also is not a royal's place.
+    pub fn is_outer_cannon(&self) -> bool {
+        self.is_cannon() && !(self.x == 0 && self.y == 0)
+    }
+
+    // Return true if self is part of the outer edge that contains the royals,
+    // false otherwise.
+    pub fn is_edge(&self) -> bool {
+        !self.is_cannon()
+    }
+
     pub fn x(&self) -> i8 { self.x }
     pub fn y(&self) -> i8 { self.y }
 }
@@ -187,13 +216,14 @@ impl Game {
     pub fn set_up(&mut self) {
         let mut royals_pile = Pile::new();
 
-        for position in vec![(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)] {
+        for position in BoardPosition::all_valid() {
+            if !position.is_outer_cannon() { continue }
             'search_card: loop {
                 let card = self.deck.draw().unwrap();
                 if card.is_royal() {
                     royals_pile.place_card_on_top(card);
                 } else {
-                    self.board.place_card_at(BoardPosition::new(position).unwrap(), card);
+                    self.board.place_card_at(position, card);
                     break 'search_card;
                 }
             }
@@ -204,18 +234,16 @@ impl Game {
 
     pub fn can_place_at(&self, pos: BoardPosition) -> bool {
         // TODO: We should probably clean up this code a litte bit...
-        // TODO: Allow placing a normal card on a royal with the meaning of
-        // adding armor to that royal.
         if self.drawn.is_none() {
             false
         } else {
             let drawn = self.drawn.unwrap();
             if drawn.is_royal() {
-                if pos.x() >= -1 && pos.x() <= 1 && pos.y() >= -1 && pos.y() <= 1 { false }
+                if pos.is_cannon() { false }
                 else if self.get_card_at(pos).is_some() { false }
                 else { true } // TODO
             } else {
-                if pos.x() >= -1 && pos.x() <= 1 && pos.y() >= -1 && pos.y() <= 1 {
+                if pos.is_cannon() {
                     match self.get_card_at(pos) {
                         None => true,
                         Some(card) => {
