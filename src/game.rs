@@ -427,14 +427,7 @@ impl Game {
         self.board.get_armor_at(pos)
     }
 
-    // TODO: remove_pile_at, move_pile_to_bottom_of_deck_at: Game itself should
-    // know when to move piles around.
-
-    pub fn remove_pile_at(&mut self, pos: BoardPosition) {
-        self.board.remove_pile_at(pos);
-    }
-
-    pub fn move_pile_to_bottom_of_deck_at(&mut self, pos: BoardPosition) {
+    fn move_pile_to_bottom_of_deck_at(&mut self, pos: BoardPosition) {
         self.deck.place_pile_on_bottom(self.board.take_pile_at(pos));
     }
 
