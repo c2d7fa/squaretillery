@@ -374,7 +374,11 @@ impl Game {
                         },
                     }
                 } else {
-                    false
+                    if self.get_card_at(pos).is_some() {
+                        true  // Can place card to add armor
+                    } else {
+                        false
+                    }
                 }
             }
         }
@@ -384,9 +388,11 @@ impl Game {
         self.board.get_card_at(pos)
     }
 
-    pub fn place_card_at(&mut self, pos: BoardPosition) -> Result<(), String> {
+    pub fn place_card_at(&mut self, pos: BoardPosition) -> Option<()> {
+        if !self.can_place_at(pos) { return None; }
+
         if self.drawn.is_none() {
-            Err("Cannot place card because there is no drawn card.".to_string())
+            panic!();
         } else {
             let card = self.get_card_at(pos);
             if card.is_some() && card.unwrap().is_royal() {
@@ -403,7 +409,7 @@ impl Game {
                 self.board.place_card_at(pos, self.drawn.unwrap());
                 self.drawn = None;
             }
-            Ok(())
+            Some(())
         }
     }
 

@@ -235,27 +235,18 @@ pub fn main() {
                     }
                 },
                 Event::MouseButtonUp { x, y, mouse_btn: MouseButton::Left, .. } => {
-                    if dragged_card.is_some() {
-                        translate_screen_to_board((x, y)).map(|pos| {
-                            game.place_card_at(pos).unwrap();
-                        });
-
-                        dragged_card = None;
-                        dragged_offset = None;
-                    }
-                },
-                Event::MouseButtonUp { x, y, mouse_btn: MouseButton::Middle, .. } => {
                     translate_screen_to_board((x, y)).map(|pos| {
-                        game.remove_pile_at(pos)
+                        if game.can_place_at(pos) {
+                            game.place_card_at(pos).unwrap();
+                        }
                     });
+
+                    dragged_card = None;
+                    dragged_offset = None;
                 },
                 Event::MouseButtonUp { x, y, mouse_btn: MouseButton::Right, .. } => {
                     if inside_draw_pile((x, y)) && game.drawn().is_some() {
                         game.add_to_shame_pile();
-                    } else {
-                        translate_screen_to_board((x, y)).map(|pos| {
-                            game.move_pile_to_bottom_of_deck_at(pos)
-                        });
                     }
                 },
                 _ => {}
