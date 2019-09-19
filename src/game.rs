@@ -165,6 +165,38 @@ impl BoardPosition {
         result
     }
 
+    // If self is outer cannon, return the positions that are "aimed at", that
+    // is, the royals that could be killed by placing a card here. In other
+    // cases, return an empty vector.
+    fn aimed_at(&self) -> Vec<BoardPosition> {
+        // TODO: This is not the most elegant algorithm. Not sure if there is a
+        // better way? Or maybe we should just hardcode all of the positions?
+        if (self.x, self.y) == (-1, -1) {
+            vec![BoardPosition::new((-1, 2)).unwrap(), BoardPosition::new((2, -1)).unwrap()]
+        } else if (self.x, self.y) == (-1, 0) {
+            vec![BoardPosition::new((2, 0)).unwrap()]
+        } else if (self.x, self.y) == (0, -1) {
+            vec![BoardPosition::new((0, 2)).unwrap()]
+        } else if self.x > 0 {
+            BoardPosition::new((-self.x, self.y)).unwrap().aimed_at().into_iter().map(|p| { BoardPosition::new((-p.x(), p.y())).unwrap() }).collect()
+        } else if self.y > 0 {
+            BoardPosition::new((self.x, -self.y)).unwrap().aimed_at().into_iter().map(|p| { BoardPosition::new((p.x(), -p.y())).unwrap() }).collect()
+        } else {
+            vec![]
+        }
+    }
+
+    // If self is the position of a royal, return the tiles that make up the
+    // "cannon", that is, the tiles whose sum would be used as the damage when
+    // attacking the royal at self. In other cases, return an empty vector.
+    fn cannon_towards(&self) -> Vec<BoardPosition> {
+        if self.x == -2 { vec![BoardPosition::new((-1, self.y)).unwrap(), BoardPosition::new((0, self.y)).unwrap()] }
+        else if self.x == 2 { vec![BoardPosition::new((0, self.y)).unwrap(), BoardPosition::new((1, self.y)).unwrap()] }
+        else if self.y == -2 { vec![BoardPosition::new((self.x, -1)).unwrap(), BoardPosition::new((self.x, 0)).unwrap()] }
+        else if self.y == 2 { vec![BoardPosition::new((self.x, 0)).unwrap(), BoardPosition::new((self.x, 1)).unwrap()] }
+        else { vec![] }
+    }
+
     pub fn x(&self) -> i8 { self.x }
     pub fn y(&self) -> i8 { self.y }
 }
@@ -232,6 +264,29 @@ impl Board {
             if self.get_card_at(adj).is_none() { result.push(adj) }
         }
         result
+    }
+
+    pub fn resolve_attack(&mut self, royal: BoardPosition) {
+        if let Some(royal_card) = self.get_card_at(royal) {
+            let health = royal_card.value() + self.get_armor_at(royal);
+
+            let mut is_valid_attack = true;
+
+            let mut damage = 0;
+            for cannon_pos in royal.cannon_towards() {
+                if let Some(card) = self.get_card_at(cannon_pos) {
+                    if royal_card.value() == 12 && !card.suit().is_same_color_as(royal_card.suit()) { is_valid_attack = false; }
+                    if royal_card.value() == 13 && card.suit() != royal_card.suit() { is_valid_attack = false; }
+                    damage += card.value();
+                } else {
+                    is_valid_attack = false;
+                }
+            }
+
+            if damage >= health && is_valid_attack {
+                self.remove_pile_at(royal);
+            }
+        }
     }
 
     // TODO: Error checking
@@ -336,11 +391,15 @@ impl Game {
             let card = self.get_card_at(pos);
             if card.is_some() && card.unwrap().is_royal() {
                 self.add_armor_at(pos).unwrap();
-            } else if self.drawn.unwrap().value() == 1 || self.drawn.unwrap().value() == 0 {
-                self.move_pile_to_bottom_of_deck_at(pos);
-                self.board.place_card_at(pos, self.drawn.unwrap());
-                self.drawn = None;
             } else {
+                if self.drawn.unwrap().value() == 1 || self.drawn.unwrap().value() == 0 {
+                    self.move_pile_to_bottom_of_deck_at(pos);
+                }
+
+                for attacked in pos.aimed_at() {
+                    self.board.resolve_attack(attacked);
+                }
+
                 self.board.place_card_at(pos, self.drawn.unwrap());
                 self.drawn = None;
             }
