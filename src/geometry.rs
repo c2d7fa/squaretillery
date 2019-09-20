@@ -26,8 +26,8 @@ pub fn align_text<'a>(font: &Font<'a, 'static>, text: &'a str, parent: Rect, hor
 
     let y = match vertical_alignment {
         Top => py + vertical_margin,
-        Middle => py + (ph - th) as i32 / 2,
-        Bottom => py + (ph - th) as i32 - vertical_margin,  // Margin ignored
+        Middle => py + (ph - th) as i32 / 2 + vertical_margin,
+        Bottom => py + (ph - th) as i32 - vertical_margin,
     };
 
     (x, y)

@@ -24,6 +24,8 @@ const ROYAL_BORDER_WIDTH: u32 = 10;
 const UI_FONT_HEIGHT: u16 = 25;
 const UI_SPACE: i32 = 8;
 const DRAW_PILE_POSITION: (i32, i32) = ((CARD_SPACE + CARD_WIDTH as i32) * 5 + CARD_SPACE, CARD_SPACE);
+const WINDOW_WIDTH: u32 = (CARD_WIDTH + CARD_SPACE as u32) * 6 + CARD_SPACE as u32;
+const WINDOW_HEIGHT: u32 = (CARD_WIDTH + CARD_SPACE as u32) * 5 + CARD_SPACE as u32;
 
 fn translate_screen_to_board((x, y): (i32, i32)) -> Option<BoardPosition> {
     let board_x = x / (CARD_SPACE + CARD_WIDTH as i32) - 2;
@@ -195,7 +197,7 @@ pub fn main() {
     let ui_font = ttf.load_font("./sansb.ttf", UI_FONT_HEIGHT).unwrap();
     let card_font = ttf.load_font("./sansb.ttf", CARD_FONT_HEIGHT).unwrap();
 
-    let window = video.window("Squaretillery", (CARD_WIDTH + CARD_SPACE as u32) * 6 + CARD_SPACE as u32, (CARD_WIDTH + CARD_SPACE as u32) * 5 + CARD_SPACE as u32)
+    let window = video.window("Squaretillery", WINDOW_WIDTH, WINDOW_HEIGHT)
         .position_centered()
         //.allow_highdpi()
         .build().unwrap();
@@ -256,54 +258,71 @@ pub fn main() {
         context.canvas.set_draw_color(Color::RGB(0xF2, 0xEB, 0xE8));
         context.canvas.clear();
 
-        // Update mouse cursor
-
-        let (mouse_x, mouse_y) = {
-            let mouse_state = event_pump.mouse_state();
-            (mouse_state.x(), mouse_state.y())
-        };
-
-        if inside_draw_pile((mouse_x, mouse_y)) && game.drawn().is_none() {
-            cursor_hand.set();
-        } else {
-            cursor_default.set();
-        }
-
-        // Render current (drawn) card
-
-        if dragged_card.is_none() {
-            draw_card(&mut context, game.drawn(), DRAW_PILE_POSITION);
-        } else {
-            draw_card(&mut context, None, DRAW_PILE_POSITION);
-        }
-
-        (|context: &mut DrawContext| {
-            draw_text_align(context, context.ui_font, &format!("{} LEFT", game.cards_left()), Color::RGB(0x82, 0x7B, 0x78),
-                            Rect::new(DRAW_PILE_POSITION.0, DRAW_PILE_POSITION.1 + CARD_WIDTH as i32, CARD_WIDTH, 0),
-                            AlignH::Center, AlignV::Top, 0, UI_SPACE);
-        })(&mut context);
-
-        // Render shame
-
-        if game.get_shame() > 0 {
+        if game.is_game_over() {
             (|context: &mut DrawContext| {
-                draw_text_align(context, context.ui_font, &format!("{} SHAME", game.get_shame()), Color::RGB(0xC2, 0x7B, 0x78),
-                                Rect::new(DRAW_PILE_POSITION.0, DRAW_PILE_POSITION.1 + CARD_WIDTH as i32 + UI_SPACE + UI_FONT_HEIGHT as i32, CARD_WIDTH, 0),
+                draw_text_align(context, context.card_font, "GAME OVER", Color::RGB(0x62, 0x5B, 0x58),
+                                Rect::new(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT),
+                                AlignH::Center, AlignV::Middle, 0, 0);
+                if game.get_shame() == 0 {
+                    draw_text_align(context, context.ui_font, "PERFECT GAME", Color::RGB(0x74, 0x98, 0x70),
+                                    Rect::new(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT),
+                                    AlignH::Center, AlignV::Middle, 0, CARD_FONT_HEIGHT as i32 + UI_SPACE as i32);
+                } else {
+                    draw_text_align(context, context.ui_font, &format!("{} SHAME", game.get_shame()), Color::RGB(0xC2, 0x7B, 0x78),
+                                    Rect::new(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT),
+                                    AlignH::Center, AlignV::Middle, 0, CARD_FONT_HEIGHT as i32 + UI_SPACE as i32);
+                }
+            })(&mut context);
+        } else {
+            // Update mouse cursor
+
+            let (mouse_x, mouse_y) = {
+                let mouse_state = event_pump.mouse_state();
+                (mouse_state.x(), mouse_state.y())
+            };
+
+            if inside_draw_pile((mouse_x, mouse_y)) && game.drawn().is_none() {
+                cursor_hand.set();
+            } else {
+                cursor_default.set();
+            }
+
+            // Render current (drawn) card
+
+            if dragged_card.is_none() {
+                draw_card(&mut context, game.drawn(), DRAW_PILE_POSITION);
+            } else {
+                draw_card(&mut context, None, DRAW_PILE_POSITION);
+            }
+
+            (|context: &mut DrawContext| {
+                draw_text_align(context, context.ui_font, &format!("{} LEFT", game.cards_left()), Color::RGB(0x82, 0x7B, 0x78),
+                                Rect::new(DRAW_PILE_POSITION.0, DRAW_PILE_POSITION.1 + CARD_WIDTH as i32, CARD_WIDTH, 0),
                                 AlignH::Center, AlignV::Top, 0, UI_SPACE);
             })(&mut context);
+
+            // Render shame
+
+            if game.get_shame() > 0 {
+                (|context: &mut DrawContext| {
+                    draw_text_align(context, context.ui_font, &format!("{} SHAME", game.get_shame()), Color::RGB(0xC2, 0x7B, 0x78),
+                                    Rect::new(DRAW_PILE_POSITION.0, DRAW_PILE_POSITION.1 + CARD_WIDTH as i32 + UI_SPACE + UI_FONT_HEIGHT as i32, CARD_WIDTH, 0),
+                                    AlignH::Center, AlignV::Top, 0, UI_SPACE);
+                })(&mut context);
+            }
+
+            // Render board
+
+            for pos in BoardPosition::all_valid() {
+                draw_card_on_board(&mut context, &game, pos, dragged_card.is_some());
+            }
+
+            // Render card being dragged
+
+            dragged_card.map(|card| {
+                draw_card(&mut context, Some(card), (event_pump.mouse_state().x() - dragged_offset.unwrap().0, event_pump.mouse_state().y() - dragged_offset.unwrap().1));
+            });
         }
-
-        // Render board
-
-        for pos in BoardPosition::all_valid() {
-            draw_card_on_board(&mut context, &game, pos, dragged_card.is_some());
-        }
-
-        // Render card being dragged
-
-        dragged_card.map(|card| {
-            draw_card(&mut context, Some(card), (event_pump.mouse_state().x() - dragged_offset.unwrap().0, event_pump.mouse_state().y() - dragged_offset.unwrap().1));
-        });
 
         context.canvas.present();
     }

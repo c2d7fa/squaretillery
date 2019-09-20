@@ -107,6 +107,10 @@ impl Pile {
     pub fn size(&self) -> usize {
         self.cards.len()
     }
+
+    pub fn royals_left(&self) -> usize {
+        self.cards.iter().filter(|c| { c.is_royal() }).count()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -453,6 +457,11 @@ impl Game {
 
     pub fn get_shame(&self) -> u8 {
         self.shame
+    }
+
+    pub fn is_game_over(&self) -> bool {
+        self.deck.royals_left() == 0 ||
+            self.deck.size() == 0  // No possible actions (TODO: Handle this case in scoring)
     }
 }
 
